@@ -1,6 +1,6 @@
-# North Pier 04 Site Monitor
+# Oil Field Monitor
 
-A touch-friendly, full-screen oil-rig monitoring UI prototype. The site plan covers a sample 160-, 400-, or 640-acre area and shows mock equipment sensors, plain-language alerts, and a recent activity log.
+A touch-friendly operations monitor for oil-field telemetry. It shows an equipment-flow diagram only while alerts are active, raises red-alert popups, keeps opened alerts in a scrollable dashboard, and records acknowledgement, resolution, and sensor activity in the site log.
 
 ## Run locally
 
@@ -9,37 +9,57 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite (usually `http://localhost:5173`).
+Open the local URL printed by Vite. Run the monitor over HTTPS or `localhost` to use Web Serial.
+
+## Sensor inputs
+
+### Dataset files
+
+Choose `network.json`, `ops.json`, and `telemetry.csv` together with **Load data**. The CSV format is:
+
+```csv
+timestamp,ts_unix,asset_id,metric,value
+2026-10-05T00:00:00Z,1791158400,S1_TANK_A,level_pct,84.5
+```
+
+The monitor validates asset IDs, metric types, timestamps, status values, and tank levels before processing. Files are limited to 100 MB each and 2,000,000 telemetry rows. The provided `network.json` and `ops.json` are used as the default asset map and operating context for a serial connection. The app does not load answer-key files.
+
+### Web Serial
+
+Select **Connect sensor** and grant access to the intended serial device. The device must send one newline-delimited JSON object per reading at 115200 baud:
+
+```json
+{"timestamp":"2026-10-05T00:00:00Z","ts_unix":1791158400,"asset_id":"S1_TANK_A","metric":"level_pct","value":84.5}
+```
+
+Use the asset IDs and supported metric names in `network.json` and the telemetry dataset. The browser requests the port only after the user selects **Connect sensor**; it cannot silently attach to hardware. Disconnect the sensor from the UI when finished.
+
+A tank overflow contact can report `{"asset_id":"S1_TANK_A","metric":"overflow","value":1,"ts_unix":1791158400}` to raise a red alarm; `value: 0` reports that the contact is clear. A stale serial feed is shown as stale rather than all clear.
+
+## Alert behavior
+
+- Tank fill at or above the configured warning limit (85% in the supplied network) raises a yellow warning. At the configured shutdown limit (92%), the monitor raises a red alert and reports the documented well shut-in procedure.
+- A pump fault status raises a red alert. Sustained pipeline pressure loss and low pump discharge pressure are detected using the operating offsets described in the project specification.
+- Red alerts open a popup and play the enabled siren. Browser audio must first be enabled by the user.
+- Opened alerts remain in the side dashboard. Acknowledging removes an alert from active display; **Solved** in the site log reports it green. Normal telemetry clears an alert when its detected condition is no longer present.
+- Cost growth is a production-at-risk estimate based on configured well output and commodity prices. It is not a site-specific accounting value.
+
+This application is a read-only monitor. It does not issue shutdown, pump, or other equipment-control commands. Follow site procedures and approved control and safety systems for real operations.
 
 ## SpacetimeDB state sync
 
-The TypeScript module in `spacetimedb/` stores each user's simulated and Live Sim feeds separately. Feed settings, sensors, alert acknowledgements, and recent activity are written through the `sync_feed` reducer. Private tables are exposed to clients only through views filtered to the caller's identity.
-
-Build the module and regenerate the client bindings after changing its schema:
+The TypeScript module in `spacetimedb/` stores each user's live alert state and recent activity. Its caller-filtered views and `sync_feed` reducer provide the browser persistence and synchronization path. The module must be published before the frontend can sync; build and binding generation do not publish it.
 
 ```sh
 spacetime build
 spacetime generate --lang typescript --module-path spacetimedb --out-dir src/module_bindings --import-extension js
 ```
 
-The frontend connects to `wss://maincloud.spacetimedb.com` and the database configured in `spacetime.local.json` by default. Override these with `VITE_SPACETIMEDB_URI` and `VITE_SPACETIMEDB_DB_NAME` when running Vite. The module must be published to that database before the frontend can sync; build and binding generation above do not publish it.
+The frontend connects to `wss://maincloud.spacetimedb.com` and the database configured in `spacetime.local.json` by default. Override these with `VITE_SPACETIMEDB_URI` and `VITE_SPACETIMEDB_DB_NAME` when running Vite.
 
-## Try the prototype
+## Checks
 
-- Tap a generated sensor marker to see its sample reading and, when needed, a suggested next step.
-- Use **All sensors** / **Needs attention** to filter the site plan.
-- Change the site boundary size or zoom the plan.
-- **Simulated** and **Live Sim** are independent feeds, like separate tabs. Alerts, map positions, acknowledgements, and activity in one do not appear in the other. Live Sim does not generate alerts automatically; use **Create alert** to enter a custom alert, its severity and details, response time, cost-growth rate, and any number of potential solutions. In Simulated, **Random alert** adds one sample alert on demand; **Auto alerts: ON/OFF** separately enables or pauses periodic sample alerts and is off by default. Neither feed is connected to real equipment.
-- Each alert stores its severity as a numeric level: green = 1, yellow = 2, red = 3. Its level remains fixed until the alert's simulated data changes it; colors and icons are derived from that level. Multi-level changes such as green to red (+2) or red to green (-2) are supported by the model.
-- In Simulated, **Delete last alert** removes the most recently generated sample alert.
-- Emergency alerts appear immediately without a sound-permission popup. Sound is off until enabled from the header; it can also be tested or muted there.
-- Red demo emergencies open in a full-screen alert view, ordered by simulated cost growth. Up to four can be displayed at once.
-- Emergency timers appear in red pop-ups. Sensor icons show a shrinking urgency ring instead of a text countdown; acknowledging an alert removes its ring.
-- Potential response costs are shown in US dollars. The S1 Pump C sample uses the HackUTD opening-scene figures: $905 for one truck trip, $1,958 for shutting in one well, and $5,016 for doing nothing. Selecting an option only records a choice in the demo; it never dispatches trucks or controls equipment.
-- Use **View in alert panel** to move an emergency aside. **Acknowledge alert** marks the demo record complete and stops that example timer; it does not mean the condition is safe or resolved.
-- On a narrow display, switch between the alert, sensor, and site-log tabs below the site plan.
-- Taps show a brief visual ring, including on non-actionable display areas.
-
-## Important
-
-Readings, urgency windows, generated alerts, and actions are simulated training examples. The three S1 Pump C cost figures are taken from the HackUTD sample scenario and are not estimates for another site or current prices. The demo has no live sensor connection and cannot monitor, acknowledge, dispatch, or control real rig equipment. It is not an emergency notification or safety system. Follow site procedures and approved safety systems for real operations.
+```sh
+npm test
+npm run build
+```
