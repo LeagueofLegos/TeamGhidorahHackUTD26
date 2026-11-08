@@ -3,8 +3,16 @@ import { setTimeout as delay } from "node:timers/promises";
 import { cli, database, httpOrigin, startServer, stopProcess } from "./cli.js";
 import { connectNode } from "./connection.js";
 import { DEFAULT_FOLDER, importDataset } from "./import.js";
-const args = process.argv.slice(2),
-  folder = args.find((a) => !a.startsWith("--")) ?? DEFAULT_FOLDER;
+const args = process.argv.slice(2);
+let folder=DEFAULT_FOLDER,port:string|undefined,tank:string|undefined,mock=false;
+for(let i=0;i<args.length;i++) {
+  const arg=args[i];
+  if(arg==='--mock')mock=true;
+  else if(['--dataset','--port','--tank'].includes(arg)) {const value=args[++i];if(!value||value.startsWith('--'))throw new Error(`Missing value for ${arg}`);if(arg==='--dataset')folder=value;else if(arg==='--port')port=value;else tank=value;}
+  else if(!arg.startsWith('-'))folder=arg;
+  else throw new Error(`Unknown startup option ${arg}. Run npm.cmd start -- --help from the root.`);
+}
+if(mock&&port)throw new Error('Choose --mock or --port, not both.');
 let server: ReturnType<typeof startServer> | undefined,
   child: ReturnType<typeof spawn> | undefined;
 let shuttingDown = false;
@@ -47,15 +55,15 @@ try {
     database,
   ]);
   console.log(`Database ready: ${database} at ${httpOrigin}`);
-  if (args.includes("--mock"))
+  if (mock||port)
     child = spawn(
       process.execPath,
       [
         "node_modules/tsx/dist/cli.mjs",
         "bridge/main.ts",
-        "--mock",
-        "--count",
-        "86400",
+        ...(mock?["--mock","--count","86400"]:["--port",port!]),
+        "--dataset",folder,
+        ...(tank?["--tank",tank]:[]),
       ],
       { stdio: "inherit", windowsHide: true },
     );

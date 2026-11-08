@@ -2,9 +2,12 @@
   "name": "team-ghidorah-hackutd26",
   "version": "1.0.0",
   "private": true,
+  "type":"module",
+  "main":"main.mjs",
   "scripts": {
     "setup": "npm --prefix backend ci && npm --prefix frontend ci",
-    "dev": "node scripts/dev.mjs",
+    "start":"node main.mjs",
+    "dev": "node main.mjs",
     "dev:backend": "npm --prefix backend run dev --",
     "dev:frontend": "npm --prefix frontend run dev",
     "watch": "npm --prefix backend run watch",
