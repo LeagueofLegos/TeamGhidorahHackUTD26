@@ -2,6 +2,8 @@
 
 Verified on Windows with Node.js 26.13.0 and SpacetimeDB 2.14.1.
 
+The final test tooling uses Vitest 5.1.0; type checks and all nine datastore reducer tests passed after that update. `npm audit` reported zero known dependency vulnerabilities on this verification date.
+
 `npm run test:all` passed:
 
 - TypeScript checks for backend, bridge, generated client, tests, and database module.
