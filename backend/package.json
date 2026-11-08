@@ -5,9 +5,13 @@
   "license": "ISC",
   "author": "Bryan Cortez",
   "type": "module",
-  "main": "index.js",
+  "private": true,
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "check": "tsc --project tsconfig.json",
+    "inspect": "tsx src/inspect_telemetry.ts",
+    "detect": "tsx src/detect_events.ts",
+    "test": "tsx --test src/detection.test.ts",
+    "test:integration": "tsx --test src/dataset.integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
