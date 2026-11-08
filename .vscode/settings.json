@@ -1,0 +1,8 @@
+{
+  "github.copilot.mcpServers": {
+    "spacetimedb": {
+      "command": "spacetime",
+      "args": ["mcp"]
+    }
+  }
+}

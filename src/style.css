@@ -244,7 +244,14 @@ button:focus-visible, [role="button"]:focus-visible { outline: 3px solid #fff; o
 .event-copy small { color: #adb9bb; font: 10px "IBM Plex Mono", monospace; white-space: nowrap; }
 
 .footerbar { height: 42px; flex: 0 0 42px; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 0 18px; border-top: 1px solid #39474d; background: #192329; color: #d2dad9; font: 11px "IBM Plex Mono", monospace; letter-spacing: .35px; }
-.footer-left { display: flex; align-items: center; gap: 9px; }
+.footer-right { display: flex; align-items: center; gap: 14px; }
+.database-status { display: inline-flex; align-items: center; gap: 6px; color: #bdc9c7; }
+.database-status i { width: 7px; height: 7px; border-radius: 50%; background: #b69048; }
+.database-status.connected i { background: #67b77c; }
+.database-status.error i, .database-status.disconnected i { background: #e0786c; }
+.database-status.reconnecting i, .database-status.syncing i { background: #e6b95f; }
+.footer-left { display: flex; align-items: center; gap: 9px;   .footer-right { gap: 6px; }
+}
 .footer-sim-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--amber); }
 .footer-sep { color: #849397; }
 .footer-disclaimer { color: #afc0c1; }

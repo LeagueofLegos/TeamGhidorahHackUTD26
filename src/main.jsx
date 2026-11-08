@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useSyncExternalStore } from "react"
 import { createRoot } from "react-dom/client";
 import { Button, Classes } from "@blueprintjs/core";
 import { GoldenLayout } from "golden-layout";
+import { connectSpacetime, persistFeedSnapshot } from "./spacetime";
 import "@blueprintjs/core/lib/css/blueprint.css";
 import "golden-layout/dist/css/goldenlayout-base.css";
 import "golden-layout/dist/css/themes/goldenlayout-dark-theme.css";
@@ -31,6 +32,8 @@ let appState = {
   acknowledgedAt: {},
   feedMode: "simulated",
   autoGenerateAlerts: false,
+  databaseStatus: "connecting",
+  databaseError: "",
 };
 
 const feedStateKeys = [
@@ -53,6 +56,72 @@ const feedStateKeys = [
 function copyFeedState(state) {
   return Object.fromEntries(feedStateKeys.map((key) => [key, state[key]]));
 }
+
+function millisecondsAsInt64(value) {
+  return BigInt(Math.floor(Number(value) || 0));
+}
+
+function serializeFeedState(feed, state) {
+  return {
+    feed,
+    selectedSensorId: state.selectedSensorId ?? null,
+    area: state.area,
+    zoom: state.zoom,
+    filter: state.filter,
+    autoGenerateAlerts: state.autoGenerateAlerts,
+    lastCheck: millisecondsAsInt64(state.lastCheck),
+    alertStartedAt: millisecondsAsInt64(state.alertStartedAt),
+    sensors: state.sensors.map((sensor) => ({
+      sensorId: String(sensor.id),
+      startedAt: millisecondsAsInt64(sensor.startedAt || state.alertStartedAt),
+      generated: Boolean(sensor.generated),
+      custom: Boolean(sensor.custom),
+      name: sensor.name,
+      kind: sensor.kind,
+      value: sensor.value,
+      severityLevel: Number(sensor.severityLevel || severityLevelFromState(severityState(sensor))),
+      x: sensor.x,
+      y: sensor.y,
+      area: sensor.area || "",
+      message: sensor.message || "",
+      advice: sensor.advice ?? null,
+      operations: sensor.operations ?? null,
+      timeToActSeconds: sensor.timeToActSeconds == null ? null : BigInt(sensor.timeToActSeconds),
+      costGrowthPerSecond: Number(sensor.costGrowthPerSecond || 0),
+      actions: (sensor.actions || []).map((action) => ({
+        name: action.name,
+        baseCost: Number(action.baseCost),
+      })),
+      acknowledged: Boolean(state.acknowledged[sensor.id]),
+      dismissed: Boolean(state.dismissedEmergencies[sensor.id]),
+      acknowledgedAt: state.acknowledgedAt[sensor.id] == null
+        ? null
+        : millisecondsAsInt64(state.acknowledgedAt[sensor.id]),
+    })),
+    activities: state.activity.map((activity) => ({
+      time: millisecondsAsInt64(activity.time),
+      text: activity.text,
+      tone: activity.tone,
+    })),
+  };
+}
+
+const persistentStateKeys = new Set([
+  "sensors",
+  "selectedSensorId",
+  "area",
+  "zoom",
+  "filter",
+  "acknowledged",
+  "activity",
+  "lastCheck",
+  "alertStartedAt",
+  "dismissedEmergencies",
+  "acknowledgedAt",
+  "autoGenerateAlerts",
+]);
+const userTouchedFeeds = new Set();
+let databaseInitialized = false;
 
 const feedStates = {
   simulated: copyFeedState(appState),
@@ -192,8 +261,12 @@ function toggleAutoGenerateAlerts() {
   });
 }
 
-function notify() {
+function notify(persist = true) {
   listeners.forEach((listener) => listener());
+  if (persist) {
+    userTouchedFeeds.add(appState.feedMode);
+    persistFeedSnapshot(appState.feedMode, serializeFeedState(appState.feedMode, appState));
+  }
 }
 
 function subscribe(listener) {
@@ -207,7 +280,87 @@ function useAppState() {
 
 function updateState(changes) {
   appState = { ...appState, ...changes };
-  notify();
+  notify(Object.keys(changes).some((key) => persistentStateKeys.has(key)));
+}
+
+function applyDatabaseSnapshots({ settings, sensors: databaseSensors, activities }) {
+  const modes = ["simulated", "live"];
+  for (const mode of modes) {
+    if (!databaseInitialized && userTouchedFeeds.has(mode)) continue;
+    const setting = settings.find((row) => row.feed === mode);
+    if (!setting) continue;
+
+    const sensorsForFeed = databaseSensors
+      .filter((sensor) => sensor.feed === mode)
+      .map((sensor) => ({
+        id: sensor.sensorId,
+        startedAt: Number(sensor.startedAt),
+        generated: sensor.generated,
+        custom: sensor.custom,
+        name: sensor.name,
+        kind: sensor.kind,
+        value: sensor.value,
+        severityLevel: sensor.severityLevel,
+        x: sensor.x,
+        y: sensor.y,
+        area: sensor.area,
+        message: sensor.message,
+        ...(sensor.advice == null ? {} : { advice: sensor.advice }),
+        ...(sensor.operations == null ? {} : { operations: sensor.operations }),
+        ...(sensor.timeToActSeconds == null ? {} : { timeToActSeconds: Number(sensor.timeToActSeconds) }),
+        costGrowthPerSecond: sensor.costGrowthPerSecond,
+        actions: [...sensor.actions],
+      }));
+    const acknowledged = {};
+    const dismissedEmergencies = {};
+    const acknowledgedAt = {};
+    for (const sensor of databaseSensors.filter((item) => item.feed === mode)) {
+      acknowledged[sensor.sensorId] = sensor.acknowledged;
+      dismissedEmergencies[sensor.sensorId] = sensor.dismissed;
+      if (sensor.acknowledgedAt != null) {
+        acknowledgedAt[sensor.sensorId] = Number(sensor.acknowledgedAt);
+      }
+    }
+    const activityForFeed = activities
+      .filter((activity) => activity.feed === mode)
+      .sort((a, b) => a.position - b.position)
+      .map((activity) => ({
+        time: Number(activity.time),
+        text: activity.text,
+        tone: activity.tone,
+      }));
+    const nextFeedState = {
+      ...feedStates[mode],
+      sensors: sensorsForFeed,
+      selectedSensorId: setting.selectedSensorId,
+      area: setting.area,
+      zoom: setting.zoom,
+      filter: setting.filter,
+      autoGenerateAlerts: setting.autoGenerateAlerts,
+      acknowledged,
+      dismissedEmergencies,
+      acknowledgedAt,
+      lastCheck: Number(setting.lastCheck),
+      alertStartedAt: Number(setting.alertStartedAt),
+      activity: activityForFeed,
+      now: Date.now(),
+    };
+    feedStates[mode] = copyFeedState(nextFeedState);
+  }
+
+  databaseInitialized = true;
+  appState = {
+    ...appState,
+    ...copyFeedState(feedStates[appState.feedMode]),
+    notice: appState.notice,
+    now: Date.now(),
+  };
+  notify(false);
+}
+
+function updateDatabaseStatus(databaseStatus, databaseError = "") {
+  appState = { ...appState, databaseStatus, databaseError };
+  notify(false);
 }
 
 function timeNow() {
@@ -926,11 +1079,24 @@ function mountComponent(container, component) {
 }
 
 function Footer() {
-  const { feedMode } = useAppState();
+  const { feedMode, databaseStatus, databaseError } = useAppState();
+  const statusLabels = {
+    connecting: "CONNECTING",
+    syncing: "SYNCING",
+    connected: "CONNECTED",
+    reconnecting: "RECONNECTING",
+    disconnected: "OFFLINE",
+    error: "ERROR",
+  };
   return (
     <footer className="footerbar">
       <div className="footer-left"><span className="footer-sim-dot" /> {feedMode === "live" ? "LIVE SIMULATION" : "SIMULATED TRAINING DATA"} <span className="footer-sep">·</span> NOT CONNECTED TO RIG EQUIPMENT</div>
-      <span className="footer-disclaimer">Sample environment only</span>
+      <div className="footer-right">
+        <span className={`database-status ${databaseStatus}`} title={databaseError || "SpacetimeDB connection status"} aria-label={`SpacetimeDB ${statusLabels[databaseStatus] || databaseStatus}`}>
+          <i /> DATABASE {statusLabels[databaseStatus] || databaseStatus.toUpperCase()}
+        </span>
+        <span className="footer-disclaimer">Sample environment only</span>
+      </div>
     </footer>
   );
 }
@@ -938,6 +1104,10 @@ function Footer() {
 function App() {
   const [ripple, setRipple] = useState(null);
   const rippleTimer = useRef(null);
+  useEffect(() => connectSpacetime({
+    onSnapshots: applyDatabaseSnapshots,
+    onStatus: updateDatabaseStatus,
+  }), []);
   useEffect(() => {
     const timer = window.setInterval(() => {
       updateState({ now: Date.now() });

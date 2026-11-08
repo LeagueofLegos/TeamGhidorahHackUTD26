@@ -11,6 +11,19 @@ npm run dev
 
 Open the local URL printed by Vite (usually `http://localhost:5173`).
 
+## SpacetimeDB state sync
+
+The TypeScript module in `spacetimedb/` stores each user's simulated and Live Sim feeds separately. Feed settings, sensors, alert acknowledgements, and recent activity are written through the `sync_feed` reducer. Private tables are exposed to clients only through views filtered to the caller's identity.
+
+Build the module and regenerate the client bindings after changing its schema:
+
+```sh
+spacetime build
+spacetime generate --lang typescript --module-path spacetimedb --out-dir src/module_bindings --import-extension js
+```
+
+The frontend connects to `wss://maincloud.spacetimedb.com` and the database configured in `spacetime.local.json` by default. Override these with `VITE_SPACETIMEDB_URI` and `VITE_SPACETIMEDB_DB_NAME` when running Vite. The module must be published to that database before the frontend can sync; build and binding generation above do not publish it.
+
 ## Try the prototype
 
 - Tap a generated sensor marker to see its sample reading and, when needed, a suggested next step.
