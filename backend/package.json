@@ -10,8 +10,9 @@
     "check": "tsc --project tsconfig.json",
     "inspect": "tsx src/inspect_telemetry.ts",
     "detect": "tsx src/detect_events.ts",
-    "test": "tsx --test src/detection.test.ts",
-    "test:integration": "tsx --test src/dataset.integration.test.ts"
+    "plan": "tsx src/plan_responses.ts",
+    "test": "tsx --test src/detection.test.ts src/planning.test.ts",
+    "test:integration": "tsx --test src/dataset.integration.test.ts src/planning.integration.test.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
