@@ -90,7 +90,7 @@ function toDatabaseSnapshot(activeAlerts, siteLog) {
   return {
     feed: "live",
     selectedSensorId: null,
-    area: 1,
+    area: 400,
     zoom: 1,
     filter: "alerts",
     autoGenerateAlerts: false,
@@ -118,7 +118,7 @@ function toDatabaseSnapshot(activeAlerts, siteLog) {
       dismissed: false,
       acknowledgedAt: null,
     })),
-    activities: siteLog.slice(0, 100).map((entry) => ({
+    activities: siteLog.slice(0, 10).map((entry) => ({
       time: BigInt(Math.floor(Number(entry.timestamp) || Date.now())),
       text: entry.status === "solved" || entry.status === "acknowledged" || entry.status === "cleared"
         ? `${entry.title} · ${entry.status.toUpperCase()}`

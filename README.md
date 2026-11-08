@@ -59,12 +59,37 @@ This application is a read-only monitor. It does not issue shutdown, pump, or ot
 
 The TypeScript module in `spacetimedb/` stores each user's live alert state and recent activity. Its caller-filtered views and `sync_feed` reducer provide the browser persistence and synchronization path. The module must be published before the frontend can sync; build and binding generation do not publish it.
 
+### Local development server
+
+The browser must use the same server and database where the module was published. To run locally, start a local server in one terminal and leave it running:
+
+```sh
+spacetime start --listen-addr 127.0.0.1:3000
+```
+
+In another terminal, publish the module to that local server:
+
+```sh
+spacetime publish --server local --module-path spacetimedb thirsty-volcano-3675
+```
+
+The ignored `.env.local` should point Vite at the local WebSocket server and the same database name:
+
+```env
+VITE_SPACETIMEDB_URI=ws://127.0.0.1:3000
+VITE_SPACETIMEDB_DB_NAME=thirsty-volcano-3675
+```
+
+Restart `npm run dev` after changing `.env.local`. Check that the page reports **DATABASE CONNECTED**. If the browser URL still shows `wss://maincloud.spacetimedb.com`, Vite did not load the local override.
+
+### Maincloud
+
+Maincloud is a separate deployment. Authenticate with the SpacetimeDB CLI, confirm the database exists, then publish the module explicitly with `--server maincloud`. Set `VITE_SPACETIMEDB_URI=wss://maincloud.spacetimedb.com` and the matching database name in `.env.local`; restart Vite afterward. Do not mix a local server URL with a Maincloud database (or vice versa).
+
 ```sh
 spacetime build
 spacetime generate --lang typescript --module-path spacetimedb --out-dir src/module_bindings --import-extension js
 ```
-
-The frontend connects to `wss://maincloud.spacetimedb.com` and the database configured in `spacetime.local.json` by default. Override these with `VITE_SPACETIMEDB_URI` and `VITE_SPACETIMEDB_DB_NAME` when running Vite.
 
 ## Checks
 
