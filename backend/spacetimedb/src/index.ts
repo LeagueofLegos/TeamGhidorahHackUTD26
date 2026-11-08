@@ -20,7 +20,28 @@ import {
   type AnalysisState,
 } from "../../src/detection.js";
 import { planDataset } from "../../src/planning_dataset.js";
-import { features, infer, validateModel, type Model } from "../../src/ml.js";
+import {
+  createMLContext,
+  advanceMLContext,
+  contextFeatures,
+  infer,
+  validateModel,
+  type Model,
+  type MLContext,
+} from "../../src/ml.js";
+import {
+  createTankContext,
+  advanceTankContext,
+  warningForecasts,
+  type TankContext,
+} from "../../src/warning_forecast.js";
+import {
+  DEFAULT_FIELD_POLICY,
+  validateFieldPolicy,
+  evaluateField,
+  type FieldPolicy,
+} from "../../src/field_control.js";
+import type { PlanningReport } from "../../src/planning_dataset.js";
 import {
   DEMO_NOTICE,
   predictLevel,
@@ -206,6 +227,44 @@ const compressorAction = table(
     json: t.string(),
   },
 );
+const fieldControl = table(
+  { public: true },
+  {
+    id: t.string().primaryKey(),
+    state: t.string(),
+    tripped: t.bool(),
+    reason: t.string(),
+    revision: t.u32(),
+    json: t.string(),
+  },
+);
+const wellProduction = table(
+  { public: true },
+  {
+    id: t.string().primaryKey(),
+    systemId: t.string(),
+    facilityId: t.string(),
+    state: t.string(),
+    deliveredOilBpd: t.option(t.f64()),
+    deliveredGasMcfd: t.option(t.f64()),
+    deliveredWaterBpd: t.option(t.f64()),
+    json: t.string(),
+  },
+);
+const assetOperation = table(
+  { public: true },
+  { id: t.string().primaryKey(), state: t.string(), json: t.string() },
+);
+const warningForecast = table(
+  { public: true },
+  {
+    id: t.string().primaryKey(),
+    facilityId: t.string(),
+    state: t.string(),
+    hoursToShutdown: t.option(t.f64()),
+    json: t.string(),
+  },
+);
 const tick = table(
   {},
   { id: t.u64().primaryKey().autoInc(), scheduledAt: t.scheduleAt() },
@@ -230,6 +289,10 @@ const db = schema({
   audit,
   compressorState,
   compressorAction,
+  fieldControl,
+  wellProduction,
+  assetOperation,
+  warningForecast,
   tick,
 });
 export default db;
@@ -252,6 +315,15 @@ type State = {
   model?: Model;
   compressor: CompressorConfig;
   compressorTripped: boolean;
+  mlContext?: MLContext;
+  tankContext?: TankContext;
+  fieldPolicy?: FieldPolicy;
+  fieldTrip?: {
+    reason: string;
+    atTs: number;
+    atMs: number;
+    decision: ReturnType<typeof evaluateField>;
+  };
 };
 const ms = (ctx: Ctx) => Number(ctx.timestamp.microsSinceUnixEpoch / 1000n);
 function auth(ctx: Ctx, admin = false) {
@@ -264,7 +336,16 @@ function auth(ctx: Ctx, admin = false) {
 function state(ctx: Ctx): State {
   const r = ctx.db.runtime.id.find("main");
   if (!r) throw new SenderError("Configure a session first");
-  return JSON.parse(r.json);
+  const s = JSON.parse(r.json) as State;
+  s.mlContext ??= createMLContext();
+  s.tankContext ??= createTankContext();
+  s.fieldPolicy ??= { ...DEFAULT_FIELD_POLICY };
+  return s;
+}
+function advanceFrame(s: State, rows: Reading[]) {
+  advanceAnalysisFrame(s.analysis, rows);
+  advanceMLContext((s.mlContext ??= createMLContext()), s.network, rows);
+  advanceTankContext((s.tankContext ??= createTankContext()), s.network, rows);
 }
 function save(ctx: Ctx, s: State, status: string) {
   put(ctx.db.runtime, { id: "main", json: JSON.stringify(s) });
@@ -478,8 +559,15 @@ function snapshots(ctx: Ctx, s: State, quality = "ready") {
       ),
     });
   clear(ctx.db.recommendation);
+  let report: PlanningReport = {
+    nowTs: analysis.nowTs,
+    systems: [],
+    advisoryOnly: true,
+    basis: "Data unavailable",
+  };
   if (quality === "ready" && s.analysis.lastTs !== null) {
-    const report = planDataset(currentDataset(s), analysis, {
+    report = planDataset(currentDataset(s), analysis, {
+      horizonHours: (s.fieldPolicy ?? DEFAULT_FIELD_POLICY).horizonHours,
       maxSearchStates: 2000,
       maxLinearVertices: 100000,
     });
@@ -500,17 +588,21 @@ function snapshots(ctx: Ctx, s: State, quality = "ready") {
   }
   clear(ctx.db.mlInference);
   if (s.model && quality === "ready") {
-    const frame = new Map(
-      s.analysis.lastFrame.map((r) => [`${r.asset_id}/${r.metric}`, r.value]),
-    );
     for (const sys of s.network.systems)
       for (const f of sys.facilities) {
-        const x = features(f, sys.disposal_site.pressure_psi, (a, m) =>
-          frame.get(`${a}/${m}`),
+        const x = contextFeatures(
+          s.mlContext ?? createMLContext(),
+          f.id,
+          s.model.features.length,
         );
         const out = x
           ? infer(s.model, x, s.analysis.lastTs ?? 0)
-          : { state: "not_observable", label: null, scores: null };
+          : {
+              state: "not_observable",
+              label: null,
+              scores: null,
+              reason: "Pump is off/faulted or current features are incomplete.",
+            };
         ctx.db.mlInference.insert({
           id: f.id,
           state: out.state,
@@ -520,37 +612,210 @@ function snapshots(ctx: Ctx, s: State, quality = "ready") {
             features: x,
             provenance:
               s.mode === "replay"
-                ? "synthetic_challenge_data"
+                ? s.source.startsWith("Synthetic counterfactual:")
+                  ? "synthetic_counterfactual_demo"
+                  : "synthetic_challenge_data"
                 : "fictional_field_flows",
-            notice: "Uncalibrated scores; not a physical fault probability.",
+            notice:
+              "Advisory class scores, not a physical failure probability. Temperature scaling uses synthetic validation data.",
           }),
         });
       }
   }
+  clear(ctx.db.warningForecast);
+  for (const p of warningForecasts(
+    s.tankContext ?? createTankContext(),
+    s.network,
+    s.analysis.lastFrame,
+    analysis.nowTs,
+    quality,
+  ))
+    ctx.db.warningForecast.insert({
+      id: p.id,
+      facilityId: p.facilityId,
+      state: p.state,
+      hoursToShutdown: p.hoursToShutdown ?? undefined,
+      json: JSON.stringify(p),
+    });
+  updateField(
+    ctx,
+    s,
+    analysis,
+    report,
+    quality,
+    acknowledged.has("FIELD/shutdown"),
+  );
   compressor(ctx, s);
 }
+function updateField(
+  ctx: Ctx,
+  s: State,
+  analysis: ReturnType<typeof summarizeAnalysis>,
+  report: PlanningReport,
+  quality: string,
+  acknowledged: boolean,
+) {
+  const policy = (s.fieldPolicy ??= { ...DEFAULT_FIELD_POLICY });
+  const decision = evaluateField(
+    currentDataset(s),
+    analysis,
+    report,
+    policy,
+    quality,
+    warningForecasts(
+      s.tankContext ?? createTankContext(),
+      s.network,
+      s.analysis.lastFrame,
+      analysis.nowTs,
+      quality,
+    ),
+  );
+  if (decision.trigger && !s.fieldTrip) {
+    s.fieldTrip = {
+      reason: decision.triggerReason!,
+      atTs: analysis.nowTs,
+      atMs: ms(ctx),
+      decision,
+    };
+    log(ctx, "automatic_simulated_field_shutdown", {
+      ...s.fieldTrip,
+      revision: s.revision,
+      notice: DEMO_NOTICE,
+    });
+  }
+  const tripped = !!s.fieldTrip;
+  put(ctx.db.fieldControl, {
+    id: "FIELD",
+    state: tripped ? "shut_down" : decision.state,
+    tripped,
+    reason: s.fieldTrip?.reason ?? decision.explanation,
+    revision: s.revision,
+    json: JSON.stringify({
+      policy,
+      decision,
+      latched: s.fieldTrip ?? null,
+      notice: DEMO_NOTICE,
+    }),
+  });
+  if (tripped) {
+    put(ctx.db.alert, {
+      id: "FIELD/shutdown",
+      assetId: "FIELD",
+      severity: "critical",
+      message: `Complete simulated field shutdown: ${s.fieldTrip!.reason}. All modeled production is off; sensors remain monitored.`,
+      acknowledged,
+      json: JSON.stringify(s.fieldTrip),
+    });
+    for (const row of ctx.db.recommendation.iter())
+      ctx.db.recommendation.id.update({
+        ...row,
+        status: "field_shutdown",
+        totalCost: undefined,
+        savings: undefined,
+        json: JSON.stringify({
+          ...JSON.parse(row.json),
+          overriddenBy: "latched_simulated_field_shutdown",
+        }),
+      });
+  }
+  const frame = new Map(
+    s.analysis.lastFrame.map((r) => [`${r.asset_id}/${r.metric}`, r.value]),
+  );
+  clear(ctx.db.wellProduction);
+  for (const sys of s.network.systems)
+    for (const f of sys.facilities)
+      for (const w of f.wells) {
+        const observed = frame.get(`${w.id}/status`),
+          known = quality === "ready" && observed !== undefined,
+          effective = tripped ? false : known ? observed === 1 : null;
+        ctx.db.wellProduction.insert({
+          id: w.id,
+          systemId: sys.id,
+          facilityId: f.id,
+          state: tripped
+            ? "field_shutdown"
+            : !known
+              ? "unknown"
+              : effective
+                ? "producing"
+                : "observed_shut_in",
+          deliveredOilBpd:
+            effective === null ? undefined : effective ? w.oil_bpd : 0,
+          deliveredGasMcfd:
+            effective === null ? undefined : effective ? w.gas_mcfd : 0,
+          deliveredWaterBpd:
+            effective === null
+              ? undefined
+              : effective
+                ? w.baseline_water_bpd
+                : 0,
+          json: JSON.stringify({
+            observedStatus: observed ?? null,
+            quality,
+            nominalOilBpd: w.oil_bpd,
+            nominalGasMcfd: w.gas_mcfd,
+            nominalWaterBpd: w.baseline_water_bpd,
+            deferredOilBpd:
+              effective === null ? null : effective ? 0 : w.oil_bpd,
+            deferredGasMcfd:
+              effective === null ? null : effective ? 0 : w.gas_mcfd,
+            basis:
+              "Configured baseline rates; effective software-only simulation state. Recorded sensor readings are unchanged.",
+            simulated: true,
+          }),
+        });
+      }
+  clear(ctx.db.assetOperation);
+  for (const e of ctx.db.entity.iter()) {
+    const monitoring = ["tank", "sensor_device", "scrubber"].includes(e.kind),
+      observed = frame.get(`${e.id}/status`);
+    const status = monitoring
+      ? "monitoring"
+      : tripped
+        ? "field_shutdown"
+        : quality !== "ready"
+          ? "unknown"
+          : observed === 2
+            ? "fault"
+            : observed === 0
+              ? "stopped"
+              : observed === 1
+                ? "running"
+                : "observed";
+    ctx.db.assetOperation.insert({
+      id: e.id,
+      state: status,
+      json: JSON.stringify({
+        observedStatus: observed ?? null,
+        fieldShutdown: tripped,
+        simulated: true,
+      }),
+    });
+  }
+}
 function compressor(ctx: Ctx, s: State) {
+  const tripped = s.compressorTripped || !!s.fieldTrip;
   const rate = SIX_WELLS.reduce((a, b) => a + b, 0);
-  const actions = compressorComparison(s.compressor, s.compressorTripped);
+  const actions = compressorComparison(s.compressor, tripped);
   const best = actions
     .filter((a) => a.feasible)
     .sort((a, b) => a.totalCost - b.totalCost)[0];
   put(ctx.db.compressorState, {
     id: "DEMO_C101",
-    tripped: s.compressorTripped,
-    deferredMcfd: s.compressorTripped ? rate : 0,
+    tripped: tripped,
+    deferredMcfd: tripped ? rate : 0,
     json: JSON.stringify({
       wells: SIX_WELLS.map((nominalMcfd, i) => ({
         id: `DEMO_WELL_${i + 1}`,
         nominalMcfd,
-        deliveredMcfd: s.compressorTripped ? 0 : nominalMcfd,
-        deferredMcfd: s.compressorTripped ? nominalMcfd : 0,
+        deliveredMcfd: tripped ? 0 : nominalMcfd,
+        deferredMcfd: tripped ? nominalMcfd : 0,
       })),
       config: s.compressor,
       recommendation: {
-        state: s.compressorTripped ? "advisory" : "monitoring",
-        action: s.compressorTripped ? best.action : null,
-        totalCost: s.compressorTripped ? best.totalCost : null,
+        state: tripped ? "advisory" : "monitoring",
+        action: tripped ? best.action : null,
+        totalCost: tripped ? best.totalCost : null,
         reason: best.reason,
         advisoryOnly: true,
       },
@@ -565,7 +830,7 @@ function compressor(ctx: Ctx, s: State) {
       totalCost: a.totalCost,
       json: JSON.stringify({
         ...a,
-        basis: s.compressorTripped ? "simulated_trip" : "no_trip",
+        basis: tripped ? "simulated_trip" : "no_trip",
         notice: DEMO_NOTICE,
       }),
     });
@@ -600,7 +865,9 @@ function publishReadings(ctx: Ctx, s: State) {
   for (const r of s.analysis.lastFrame) {
     const provenance =
       s.mode === "replay"
-        ? "synthetic_challenge_data"
+        ? s.source.startsWith("Synthetic counterfactual:")
+          ? "synthetic_counterfactual_demo"
+          : "synthetic_challenge_data"
         : r.metric === "level_pct" && r.asset_id === s.mapping
           ? s.mode === "hardware"
             ? "measured_mapped_to_fictional_tank"
@@ -658,6 +925,7 @@ export const configure_session = db.reducer(
       mapping?: string;
       virtualStep?: number;
       model?: Model;
+      fieldPolicy?: FieldPolicy;
     };
     validateConfiguration(c.network, c.ops);
     requireText(c.session, "session");
@@ -687,6 +955,7 @@ export const configure_session = db.reducer(
     if (!Number.isInteger(virtualStep) || virtualStep < 1 || virtualStep > 600)
       throw new SenderError("Virtual step must be 1..600 seconds");
     if (c.model) validateModel(c.model);
+    if (c.fieldPolicy) validateFieldPolicy(c.fieldPolicy);
     const s: State = {
       network: c.network,
       ops: c.ops,
@@ -705,6 +974,9 @@ export const configure_session = db.reducer(
       model: c.model,
       compressor: { ...DEFAULT_COMPRESSOR },
       compressorTripped: false,
+      mlContext: createMLContext(),
+      tankContext: createTankContext(),
+      fieldPolicy: c.fieldPolicy ?? { ...DEFAULT_FIELD_POLICY },
     };
     for (const tab of [
       ctx.db.sensorCurrent,
@@ -718,6 +990,10 @@ export const configure_session = db.reducer(
       ctx.db.hardwarePrediction,
       ctx.db.scenario,
       ctx.db.modelInfo,
+      ctx.db.fieldControl,
+      ctx.db.wellProduction,
+      ctx.db.assetOperation,
+      ctx.db.warningForecast,
     ])
       clear(tab);
     if (s.model)
@@ -759,7 +1035,7 @@ export const ingest_frames = db.reducer(
       throw new SenderError("Use 1..20 import frames or one live replay frame");
     for (const rows of frames) {
       validateRows(s, rows);
-      advanceAnalysisFrame(s.analysis, rows);
+      advanceFrame(s, rows);
     }
     s.receivedMs = ms(ctx);
     s.revision++;
@@ -919,7 +1195,7 @@ export const ingest_hardware = db.reducer(
             selected ? 0 : sys.disposal_site.pressure_psi + 50,
           );
         }
-      advanceAnalysisFrame(s.analysis, rows);
+      advanceFrame(s, rows);
       publishReadings(ctx, s);
     }
     snapshots(ctx, s, quality);
@@ -1019,7 +1295,11 @@ export const compare_scenario = db.reducer(
     const result = planDataset(
       currentDataset(copy),
       summarizeAnalysis(copy.analysis, copy),
-      { maxSearchStates: 2000, maxLinearVertices: 100000 },
+      {
+        maxSearchStates: 2000,
+        maxLinearVertices: 100000,
+        horizonHours: (copy.fieldPolicy ?? DEFAULT_FIELD_POLICY).horizonHours,
+      },
     );
     if (
       !ctx.db.scenario.id.find(id) &&
@@ -1059,6 +1339,57 @@ export const record_decision = db.reducer(
     });
   },
 );
+export const set_field_policy = db.reducer(
+  { json: t.string() },
+  (ctx, { json }) => {
+    auth(ctx);
+    if (json.length > 2000) throw new SenderError("Policy too large");
+    const s = state(ctx),
+      policy = JSON.parse(json) as FieldPolicy;
+    if (Object.keys(policy).some((k) => !(k in DEFAULT_FIELD_POLICY)))
+      throw new SenderError("Unknown field policy key");
+    validateFieldPolicy(policy);
+    s.fieldPolicy = policy;
+    s.revision++;
+    const quality =
+      s.mode !== "replay" && ms(ctx) - s.receivedMs > 10000
+        ? "stale"
+        : ctx.db.appState.id.find("main")!.status;
+    snapshots(ctx, s, quality);
+    save(ctx, s, quality);
+    log(ctx, "set_field_policy", { policy, notice: DEMO_NOTICE });
+  },
+);
+export const reset_field = db.reducer(
+  { revision: t.u32(), reason: t.string() },
+  (ctx, { revision, reason }) => {
+    auth(ctx);
+    requireText(reason, "reset reason", 1000);
+    const s = state(ctx);
+    if (!s.fieldTrip) throw new SenderError("Field is not latched shut");
+    if (
+      s.revision !== revision ||
+      ctx.db.appState.id.find("main")!.status !== "ready" ||
+      (s.mode !== "replay" && ms(ctx) - s.receivedMs > 10000)
+    )
+      throw new SenderError(
+        "Fresh current revision required for simulated restart",
+      );
+    s.fieldTrip = undefined;
+    s.revision++;
+    snapshots(ctx, s);
+    if (s.fieldTrip)
+      throw new SenderError(
+        "Shutdown condition is still active; simulated restart rejected",
+      );
+    save(ctx, s, "ready");
+    log(ctx, "reset_simulated_field", {
+      reason,
+      revision,
+      notice: DEMO_NOTICE,
+    });
+  },
+);
 export const housekeeping = db.reducer(
   { onSchedule: tick },
   { arg: tick.rowType },
@@ -1067,7 +1398,7 @@ export const housekeeping = db.reducer(
       throw new SenderError("Scheduled calls only");
     const row = ctx.db.runtime.id.find("main");
     if (!row) return;
-    const s = JSON.parse(row.json) as State;
+    const s = state(ctx);
     if (
       s.mode === "replay" ||
       ms(ctx) - s.receivedMs <= 10000 ||

@@ -1,0 +1,239 @@
+.backend-banner {
+  flex: 0 0 auto;
+  padding: 9px 20px;
+  background: #20382e;
+  color: #b6e4c7;
+  border-bottom: 1px solid #47705b;
+  font:
+    11px "IBM Plex Mono",
+    monospace;
+  line-height: 1.6;
+}
+.backend-banner.attention {
+  background: #422822;
+  color: #ffd6b0;
+  border-color: #a35d40;
+}
+.backend-forecast-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 20px;
+  background: #1d2a31;
+  border-bottom: 1px solid #52636a;
+  font:
+    12px "IBM Plex Mono",
+    monospace;
+}
+.backend-forecast-strip b {
+  color: #ffdc99;
+}
+.backend-forecast-strip small {
+  color: #acbec2;
+}
+.backend-panel {
+  padding: 18px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: auto;
+  height: 100%;
+}
+.backend-panel h2 {
+  font-size: 21px;
+  margin: 6px 0 10px;
+}
+.backend-panel h3 {
+  font-size: 14px;
+  color: var(--amber);
+  margin: 20px 0 8px;
+}
+.backend-panel small,
+.backend-evidence small {
+  display: block;
+  font-size: 11px;
+  color: #aab7bb;
+  line-height: 1.6;
+}
+.backend-source {
+  font:
+    11px "IBM Plex Mono",
+    monospace;
+  overflow-wrap: anywhere;
+}
+.backend-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0;
+}
+.backend-panel button {
+  background: #2b393f;
+  border: 1px solid #5b7077;
+  color: #e5e9e9;
+  border-radius: 3px;
+  min-height: 36px;
+  padding: 7px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.backend-panel button:hover:not(:disabled) {
+  background: #3a4a50;
+  border-color: #e0b361;
+}
+.backend-panel button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.field-decision {
+  padding: 13px;
+  border: 1px solid #4c7061;
+  background: #1c3028;
+  margin-top: 14px;
+  border-radius: 4px;
+}
+.field-decision.tripped {
+  background: #412623;
+  border-color: #c57758;
+}
+.field-decision b {
+  font-size: 12px;
+  letter-spacing: 0.5px;
+}
+.field-decision p {
+  font-size: 12px;
+  margin: 8px 0;
+}
+.field-decision span {
+  font-size: 11px;
+  color: #c7d3d0;
+}
+.field-decision button {
+  margin-top: 10px;
+  width: 100%;
+}
+.backend-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  margin: 10px 0;
+  table-layout: fixed;
+}
+.backend-table th {
+  text-align: left;
+  color: #aab7bb;
+  font-weight: 500;
+  border-bottom: 1px solid #596b72;
+  padding: 6px;
+}
+.backend-table td {
+  padding: 8px 6px;
+  border-bottom: 1px solid #34444b;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.backend-table th:last-child,
+.backend-table td:last-child {
+  text-align: right;
+  width: 45%;
+}
+.backend-policy {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid #34444b;
+}
+.backend-policy label {
+  font-size: 11px;
+  color: #b7c5c8;
+}
+.backend-policy input {
+  width: 100%;
+  margin-top: 4px;
+  min-height: 34px;
+  background: #111b20;
+  border: 1px solid #526269;
+  color: #eef1ef;
+  border-radius: 3px;
+  padding: 5px 8px;
+}
+.backend-policy button,
+.backend-policy small {
+  grid-column: 1/-1;
+}
+.backend-error {
+  background: #4a2926;
+  border: 1px solid #c76b61;
+  color: #ffd4cd;
+  padding: 10px;
+  overflow-wrap: anywhere;
+}
+.backend-evidence {
+  padding: 12px;
+  border: 1px solid #42575f;
+  margin-top: 14px;
+  background: #1c2a30;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 1100px) {
+  .topbar {
+    gap: 10px;
+    padding: 0 12px;
+  }
+  .site-status {
+    min-width: 170px;
+    padding: 6px;
+  }
+  .site-status-text b {
+    font-size: 11px;
+  }
+  .site-status-text span {
+    font-size: 10px;
+  }
+  .header-right {
+    gap: 7px;
+  }
+  .brand {
+    min-width: 145px;
+  }
+  .brand-name {
+    font-size: 13px;
+  }
+  .backend-banner {
+    font-size: 10px;
+    padding: 6px 12px;
+  }
+}
+@media (max-width: 700px) {
+  .topbar {
+    height: auto;
+    min-height: 95px;
+    flex-basis: auto;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px;
+  }
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .area-control {
+    display: none;
+  }
+  .brand {
+    min-width: 130px;
+  }
+  .backend-banner {
+    font-size: 9px;
+  }
+  .backend-panel {
+    padding: 12px;
+  }
+  .backend-table {
+    font-size: 11px;
+  }
+}

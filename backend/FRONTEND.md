@@ -1,4 +1,13 @@
-# React teammate handoff
+# Connected frontend
+
+The working UI is now in repository `frontend/`, adapted from the team frontend branch (revision in `frontend/SOURCE.md`). Run root `npm.cmd run setup`, then `npm.cmd run dev`, and open http://127.0.0.1:5173. It imports `backend/client/connect.ts` directly. No copy of bindings is necessary for this integrated layout.
+
+The Vite development server authorizes a browser identity through a same-origin loopback-only POST using the local publisher. Demo source controls and actions work locally without hardcoding a writer token. A static deployment has no such development routes and requires a separate authenticated operator workflow.
+
+`frontend/src/backend.js` manages connection/reconnection and actions; `backendAdapter.js` maps authoritative observations to the original UI; `BackendPanel.jsx` displays strategies, model evidence, warning forecasts, effective well production and the field latch. Local UI sample modes stay separate from backend mode.
+
+The following API details also support other React clients:
+
 
 The backend is a local SpacetimeDB 2.14.1 service. Use `spacetimedb@2.14.1` in the React app. There is no additional REST server or polling layer to maintain.
 
@@ -94,3 +103,7 @@ spacetime --root-dir .runtime call --server http://127.0.0.1:3000 ghidorah-demo 
 ```
 
 Never copy a writer token into source code. Acknowledging an alert records review; it does not repair equipment or clear a latched demo trip. Decisions only create audit records. Starting a new import/mock/bridge session resets the simulation and invalidates old producer sessions. These reducers provide no equipment-command API.
+
+## New tables and reducers
+
+`warning_forecast` exposes warning-state field hours until threshold. `field_control` exposes policy, comparable strategy costs, reason and original latched decision. `well_production` and `asset_operation` expose effective simulated state while original measurements remain unchanged. `setFieldPolicy({json})` changes explicit demo assumptions; `resetField({revision,reason})` requires fresh data and rejects active conditions. `snapshot()` includes all four tables and audit rows. ML payloads include `state`, `label`, `rawLabel`, `scores`, `topScore`, `margin`, `evidence` and `reason`. Uncertain, out-of-distribution, unobservable and pre-cutoff states must not be displayed as normal. Temperature is fit on synthetic validation data, never advertised as a physical fault probability.

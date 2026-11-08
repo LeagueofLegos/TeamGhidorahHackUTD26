@@ -48,7 +48,7 @@ In a second PyCharm terminal, from the project root:
 npm.cmd run watch
 ```
 
-This is a console observer. Your frontend teammate connects the React UI using `backend/FRONTEND.md`. The backend does not include a finished React dashboard. After database schema changes, run `npm.cmd run generate` inside `backend` and refresh the frontend's copy of the generated bindings.
+This is a console observer. The connected dashboard is at **http://127.0.0.1:5173**. Root `npm.cmd run dev` starts both applications; `npm.cmd run dev:backend` starts only the backend. The dashboard imports the backend client directly, so regenerate bindings inside `backend` after schema changes without copying files. See the repository `ARCHITECTURE.md` for the complete stack map.
 
 Everything is local, and source data is ignored by Git. Runtime state is stored under `backend/.runtime/`; producer tokens under `backend/.tokens/`. Neither directory should be committed. A normal restart republishes without deleting the database; the import then starts a new demo session. Previously recorded audit entries are retained, subject to a 500-entry demo retention limit.
 
@@ -126,7 +126,7 @@ npm.cmd run test:module
 npm.cmd run test:live
 ```
 
-There are 35 domain tests, 11 dataset integration tests, and nine database reducer tests. The live test additionally starts a separate server on port 3100 with a new test database, imports a real snapshot, connects an independent subscriber, checks the exact S2 cost, scenario isolation, authorization, audit recording, mock warmup, invalid/duplicate readings, trip latch, and scheduled staleness. It stops its own server afterward. `npm.cmd run test:all` runs all checks in sequence. The full practice data must be present for dataset/reducer/live tests.
+There are 40 backend domain tests, 11 dataset integration tests, 13 database reducer tests, and four frontend adapter tests. Root `npm.cmd run test:all` also builds the frontend and runs live database integration. The live test additionally starts a separate server on port 3100 with a new test database, imports a real snapshot, connects an independent subscriber, checks the exact S2 cost, scenario isolation, authorization, audit recording, mock warmup, invalid/duplicate readings, trip latch, and scheduled staleness. It stops its own server afterward. `npm.cmd run test:all` runs all checks in sequence. The full practice data must be present for dataset/reducer/live tests.
 
 Read these files in this order:
 
@@ -138,6 +138,18 @@ Read these files in this order:
 6. `bridge/` and `client/`: receive-only input and live subscriptions.
 7. `src/ml.ts`, `src/train_model.ts`, and `models/evaluation.json`: trained model and measured evaluation.
 
-The trained classifier uses running-flow and pressure features to distinguish normal, leak, and pump-degradation samples. Explicit fault status and tank thresholds remain rule-based. Training uses the first 30% of the synthetic practice week; held-out later samples achieve macro F1 about **0.978**. Scores are uncalibrated; this is neither an independent field validation nor a prediction of actual equipment failure. Inference is withheld at/before the training cutoff. Retraining is an explicit offline command: `npm.cmd run train -- <practice-folder> <practice-answer-key.json>`. Labels are never read by the running module, import, planner, bridge, or normal tests.
+The trained classifier uses running-flow and pressure features to distinguish normal, leak, and pump-degradation samples. Explicit fault status and tank thresholds remain rule-based. The first 30% fits weights/normalization, the next 15% selects the model and fits temperature scaling, and the final 55% tests it. Macro F1 improved from 0.97374 to **0.99386 on the same 11,027 test samples**. Ambiguous/out-of-range inputs receive no label. These are advisory synthetic class scores; this is neither an independent field validation nor a prediction of actual equipment failure. Inference is withheld at/before the training cutoff. Retraining is an explicit offline command: `npm.cmd run train -- <practice-folder> <practice-answer-key.json>`. Labels are never read by the running module, import, planner, bridge, or normal tests.
 
 The Gotham inspiration is the linked asset graph, observation provenance, event timeline, what-if comparison, explainable advice, and recorded operator decisions. There is no Palantir service dependency or integration. This prototype is for a local hackathon presentation: all decisions are advisory, cost search is bounded, sensors are uncalibrated until your hardware teammate calibrates them, and no external hardware controls are actuated.
+
+## Connected dashboard and automatic field shutdown
+
+Open http://127.0.0.1:5173 after root `npm.cmd run dev`. Select **BACKEND** for subscribed database observations; **UI SAMPLES** and **CUSTOM SAMPLES** remain the frontend teammate's isolated local playground. The **DECISIONS & ML** panel includes model evidence, source controls, warning countdowns, field strategies, and effective production. The selected-facility countdown is visible above the map. Historical snapshots stay paused; tabletop ETA uses actual seconds. On disconnect or stale data, forecasts/actions are withheld.
+
+**Load snapshot**, **Start water mock**, and **Demo: all at risk** start new simulation sessions and clear previous demo latches. **Stop mock** stops only the producer launched by this development server. Browser actions are authorized through a loopback, same-origin development route using the existing local database publisher. These routes are absent from a static production build; no equipment controls exist.
+
+Full-field policy is enabled by default. It automatically latches when (1) every currently producing facility has a usable no-action shutdown forecast within the horizon (faulted pumps also require the forecast to precede expected repair), or (2) an immediate full-field stop is cheaper than both modeled selective response and accepting shutdowns. A missing/stale input or truncated search withholds the economic trigger. The all-at-risk rule is protective and can trigger even when selective mitigation costs less. The decision explains which rule fired.
+
+All strategies use one horizon and include production loss from healthy wells. Avoidable field operating cost, shutdown cost and restart cost default to zero because they are absent from the challenge files. Enter them only as explicit demo assumptions; the UI labels them accordingly. A complete shutdown sets all 45 network wells to zero effective production, stops modeled production assets, defers the separate fictional compressor wells, keeps sensors monitored, and records an audit entry. Recorded CSV/sensor values are unchanged. Acknowledgement does not restart anything. A fresh revision-checked restart is rejected while its triggering condition remains.
+
+For terminal demonstrations, from backend: `npm.cmd run field:demo` loads an explicitly labeled synthetic all-at-risk scene. `npm.cmd run field:policy -- --hours 6 --opex 100000` demonstrates an economic stop under an explicit hypothetical operating cost. `npm.cmd run field:policy -- --opex 0` restores that assumption; then `npm.cmd run field:policy -- --reset` requests reviewed simulated restart if conditions are clear. These commands never actuate hardware.

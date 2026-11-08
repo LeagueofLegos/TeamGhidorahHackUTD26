@@ -16,6 +16,8 @@ const { importDataset, configure, DEFAULT_FOLDER } = await import(
   "../scripts/import.js"
 );
 const { DEFAULT_COMPRESSOR } = await import("../src/demo.js");
+const { DEFAULT_FIELD_POLICY } = await import("../src/field_control.js");
+const { allAtRiskFrames } = await import("../src/demo_frames.js");
 async function until(predicate: () => boolean, timeout = 10000) {
   const start = Date.now();
   while (!predicate()) {
@@ -98,6 +100,39 @@ try {
   );
   console.log(
     "PASS snapshot subscriptions, graph, $3120.94 fleet plan, scenario isolation, audit, reader authorization",
+  );
+  await writer.reducers.setFieldPolicy({
+    json: JSON.stringify({
+      ...DEFAULT_FIELD_POLICY,
+      avoidableOperatingCostPerHour: 100000,
+    }),
+  });
+  await until(() => reader.db.fieldControl.id.find("FIELD")?.tripped === true);
+  assert.equal(
+    reader.db.fieldControl.id.find("FIELD")?.reason,
+    "lowest_modeled_cost",
+  );
+  assert.equal(
+    [...reader.db.wellProduction.iter()].filter(
+      (w) => w.deliveredOilBpd === 0 && w.deliveredGasMcfd === 0,
+    ).length,
+    45,
+  );
+  assert.equal(
+    reader.db.sensorCurrent.id.find(JSON.stringify(["S1_WELL_A1", "status"]))
+      ?.value,
+    1,
+  );
+  await writer.reducers.setFieldPolicy({
+    json: JSON.stringify(DEFAULT_FIELD_POLICY),
+  });
+  await writer.reducers.resetField({
+    revision: writer.db.appState.id.find("main")!.revision,
+    reason: "Reviewed cleared economic trigger in live integration test",
+  });
+  await until(() => reader.db.fieldControl.id.find("FIELD")?.tripped === false);
+  console.log(
+    "PASS automatic economic shutdown, all 45 wells off, source preservation, and reviewed restart",
   );
   const { session } = await configure(writer, DEFAULT_FOLDER, "mock");
   for (let i = 0; i < 5; i++) {
@@ -194,6 +229,44 @@ try {
   assert.equal(reader.db.alert.id.find("DEMO_C101/trip")?.acknowledged, true);
   console.log(
     "PASS real-time smoothing, invalid/duplicate rejection, latched six-well trip, scheduled stale-data handling",
+  );
+  const full = await configure(
+    writer,
+    DEFAULT_FOLDER,
+    "replay",
+    undefined,
+    "Synthetic counterfactual: all facilities at risk",
+  );
+  await writer.reducers.ingestFrames({
+    session: full.session,
+    json: JSON.stringify(
+      allAtRiskFrames(full.dataset.network, Math.floor(Date.now() / 1000)),
+    ),
+  });
+  await writer.reducers.finishImport({ session: full.session });
+  await until(
+    () =>
+      reader.db.fieldControl.id.find("FIELD")?.reason ===
+      "all_producing_facilities_at_risk",
+  );
+  assert.equal(reader.db.warningForecast.count(), 15n);
+  assert.ok(
+    [...reader.db.warningForecast.iter()].every(
+      (p) => p.hoursToShutdown !== undefined && p.hoursToShutdown > 0,
+    ),
+  );
+  await assert.rejects(
+    writer.reducers.resetField({
+      revision: writer.db.appState.id.find("main")!.revision,
+      reason: "Attempt while all-at-risk condition remains",
+    }),
+    /still active/,
+  );
+  assert.ok(
+    [...reader.db.wellProduction.iter()].every((w) => w.deliveredOilBpd === 0),
+  );
+  console.log(
+    "PASS all-at-risk automatic field stop, warning countdowns, latch and rejected premature restart",
   );
   unsubscribe();
   console.log("LIVE INTEGRATION PASSED");

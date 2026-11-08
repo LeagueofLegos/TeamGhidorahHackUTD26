@@ -19,6 +19,7 @@ export async function configure(
   folder: string,
   mode = "replay",
   mapping?: string,
+  sourceLabel?: string,
 ) {
   const d = await loadDataset(folder),
     session = randomUUID(),
@@ -29,7 +30,8 @@ export async function configure(
       ops: d.ops,
       mode,
       session,
-      source: mode === "replay" ? d.folder : `${mode} tabletop demo`,
+      source:
+        sourceLabel ?? (mode === "replay" ? d.folder : `${mode} tabletop demo`),
       mapping,
       model,
     }),

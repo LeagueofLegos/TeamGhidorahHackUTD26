@@ -14,6 +14,8 @@ import GrantWriterReducer from "../grant_writer_reducer.js";
 import IngestFramesReducer from "../ingest_frames_reducer.js";
 import IngestHardwareReducer from "../ingest_hardware_reducer.js";
 import RecordDecisionReducer from "../record_decision_reducer.js";
+import ResetFieldReducer from "../reset_field_reducer.js";
+import SetFieldPolicyReducer from "../set_field_policy_reducer.js";
 import SimulateCompressorReducer from "../simulate_compressor_reducer.js";
 
 export type AcknowledgeAlertParams = __Infer<typeof AcknowledgeAlertReducer>;
@@ -24,6 +26,8 @@ export type GrantWriterParams = __Infer<typeof GrantWriterReducer>;
 export type IngestFramesParams = __Infer<typeof IngestFramesReducer>;
 export type IngestHardwareParams = __Infer<typeof IngestHardwareReducer>;
 export type RecordDecisionParams = __Infer<typeof RecordDecisionReducer>;
+export type ResetFieldParams = __Infer<typeof ResetFieldReducer>;
+export type SetFieldPolicyParams = __Infer<typeof SetFieldPolicyReducer>;
 export type SimulateCompressorParams = __Infer<
   typeof SimulateCompressorReducer
 >;

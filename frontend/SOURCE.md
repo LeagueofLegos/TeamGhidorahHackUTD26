@@ -1,0 +1,1 @@
+Adapted from the team's frontend branch at 238cd0597117effdb4e379013bcd417fda3454ed. Source files only were imported; generated output, node_modules and challenge datasets were excluded. The existing Blueprint/GoldenLayout design is retained.

@@ -1,53 +1,225 @@
 {
-  "method": "Temporal split: first 30% train, remaining 70% held out. Running pumps only. Same synthetic practice network; not an independent field validation.",
-  "trainedThrough": "2026-10-07T02:20:00.000Z",
+  "version": 2,
+  "method": "Chronological first 30% train, next 15% validation/model selection/temperature, final 55% test. Causal running-sample windows. Same synthetic network; not independent field validation.",
+  "fitThrough": "2026-10-07T02:20:00.000Z",
+  "trainedThrough": "2026-10-08T03:30:00.000Z",
   "trainRows": 6102,
-  "testRows": 14043,
-  "classes": [
-    "normal",
-    "pipeline_leak",
-    "pump_degradation"
-  ],
-  "confusion": [
-    [
-      12510,
-      0,
-      66
-    ],
-    [
-      4,
-      623,
-      0
-    ],
-    [
-      36,
-      0,
-      804
+  "validationRows": 3016,
+  "testRows": 11027,
+  "selection": {
+    "dimensions": 8,
+    "l2": 0.001,
+    "temperature": 0.65,
+    "candidates": [
+      {
+        "dimensions": 8,
+        "l2": 0.001,
+        "validationMacroF1": 0.9833296456814358,
+        "validationLogLoss": 0.09387298387468862
+      },
+      {
+        "dimensions": 8,
+        "l2": 0.01,
+        "validationMacroF1": 0.9824990826259578,
+        "validationLogLoss": 0.11293577439735583
+      },
+      {
+        "dimensions": 4,
+        "l2": 0.001,
+        "validationMacroF1": 0.980027939250946,
+        "validationLogLoss": 0.12630656376308294
+      }
     ]
-  ],
-  "metrics": [
-    {
-      "label": "normal",
-      "support": 12576,
-      "precision": 0.9968127490039841,
-      "recall": 0.9947519083969466,
-      "f1": 0.995781262437316
-    },
-    {
-      "label": "pipeline_leak",
-      "support": 627,
-      "precision": 1,
-      "recall": 0.9936204146730463,
-      "f1": 0.9968
-    },
-    {
-      "label": "pump_degradation",
-      "support": 840,
-      "precision": 0.9241379310344827,
-      "recall": 0.9571428571428572,
-      "f1": 0.9403508771929825
-    }
-  ],
-  "macroF1": 0.9776440465434328,
-  "notice": "Uncalibrated model scores; rules remain authoritative for fault and threshold detection. No real equipment controls."
+  },
+  "baselineSameTest": {
+    "rows": 11027,
+    "confusion": [
+      [
+        10051,
+        0,
+        53
+      ],
+      [
+        4,
+        580,
+        0
+      ],
+      [
+        0,
+        0,
+        339
+      ]
+    ],
+    "perClass": [
+      {
+        "label": "normal",
+        "support": 10104,
+        "abstained": 0,
+        "precision": 0.9996021879661859,
+        "recall": 0.9947545526524149,
+        "f1": 0.9971724787935908
+      },
+      {
+        "label": "pipeline_leak",
+        "support": 584,
+        "abstained": 0,
+        "precision": 1,
+        "recall": 0.9931506849315068,
+        "f1": 0.9965635738831615
+      },
+      {
+        "label": "pump_degradation",
+        "support": 339,
+        "abstained": 0,
+        "precision": 0.8647959183673469,
+        "recall": 1,
+        "f1": 0.9274965800273597
+      }
+    ],
+    "macroF1": 0.9737442109013706,
+    "coverage": 1,
+    "accuracyAmongAccepted": 0.9948308696835041,
+    "negativeLogLikelihood": 0.11268524902905522,
+    "brierScore": 0.032719491350228246,
+    "expectedCalibrationError": 0.09461323825154215
+  },
+  "testForcedClassification": {
+    "rows": 11027,
+    "confusion": [
+      [
+        10094,
+        2,
+        8
+      ],
+      [
+        5,
+        579,
+        0
+      ],
+      [
+        0,
+        0,
+        339
+      ]
+    ],
+    "perClass": [
+      {
+        "label": "normal",
+        "support": 10104,
+        "abstained": 0,
+        "precision": 0.9995049014753936,
+        "recall": 0.9990102929532858,
+        "f1": 0.9992575360095035
+      },
+      {
+        "label": "pipeline_leak",
+        "support": 584,
+        "abstained": 0,
+        "precision": 0.9965576592082617,
+        "recall": 0.9914383561643836,
+        "f1": 0.993991416309013
+      },
+      {
+        "label": "pump_degradation",
+        "support": 339,
+        "abstained": 0,
+        "precision": 0.9769452449567724,
+        "recall": 1,
+        "f1": 0.9883381924198251
+      }
+    ],
+    "macroF1": 0.9938623815794472,
+    "coverage": 1,
+    "accuracyAmongAccepted": 0.9986397025482906,
+    "negativeLogLikelihood": 0.02507572130729991,
+    "brierScore": 0.004378153584037605,
+    "expectedCalibrationError": 0.018241352016212034
+  },
+  "testWithAbstention": {
+    "rows": 11027,
+    "confusion": [
+      [
+        10090,
+        2,
+        3
+      ],
+      [
+        4,
+        579,
+        0
+      ],
+      [
+        0,
+        0,
+        339
+      ]
+    ],
+    "perClass": [
+      {
+        "label": "normal",
+        "support": 10104,
+        "abstained": 9,
+        "precision": 0.9996037249851397,
+        "recall": 0.9986144101346002,
+        "f1": 0.9991088226557086
+      },
+      {
+        "label": "pipeline_leak",
+        "support": 584,
+        "abstained": 1,
+        "precision": 0.9965576592082617,
+        "recall": 0.9914383561643836,
+        "f1": 0.993991416309013
+      },
+      {
+        "label": "pump_degradation",
+        "support": 339,
+        "abstained": 0,
+        "precision": 0.9912280701754386,
+        "recall": 1,
+        "f1": 0.9955947136563876
+      }
+    ],
+    "macroF1": 0.9962316508737029,
+    "coverage": 0.9990931350321937,
+    "accuracyAmongAccepted": 0.9991830806934737,
+    "negativeLogLikelihood": 0.02507572130729991,
+    "brierScore": 0.004378153584037605,
+    "expectedCalibrationError": 0.018241352016212034
+  },
+  "eventEvaluation": {
+    "confirmationSamples": 3,
+    "newHeldOutEvents": [
+      {
+        "id": "EVENT_10",
+        "facilityId": "S5_FACILITY_B",
+        "category": "pipeline_leak",
+        "onsetTs": 1791439200,
+        "detectedTs": 1791440400,
+        "delayMinutes": 20
+      },
+      {
+        "id": "EVENT_16",
+        "facilityId": "S1_FACILITY_B",
+        "category": "pipeline_leak",
+        "onsetTs": 1791518400,
+        "detectedTs": 1791519900,
+        "delayMinutes": 25
+      },
+      {
+        "id": "EVENT_17",
+        "facilityId": "S2_FACILITY_C",
+        "category": "pipeline_leak",
+        "onsetTs": 1791540000,
+        "detectedTs": 1791541200,
+        "delayMinutes": 20
+      }
+    ],
+    "eventsDetected": 3,
+    "totalEvents": 3,
+    "confirmedEpisodes": 10,
+    "falseAlarmEpisodes": 0,
+    "notice": "Event-onset delay excludes events already underway at the test boundary. Pump-off gaps can split one true event into multiple confirmed episodes."
+  },
+  "notice": "Temperature is fitted on synthetic validation data. Scores are advisory class scores, not real equipment failure probabilities. ML never actuates shutdowns; explicit fault/threshold forecasts and modeled cost policy govern the software-only simulation."
 }

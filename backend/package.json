@@ -11,7 +11,7 @@
     "inspect": "tsx src/inspect_telemetry.ts",
     "detect": "tsx src/detect_events.ts",
     "plan": "tsx src/plan_responses.ts",
-    "test": "tsx --test src/detection.test.ts src/planning.test.ts tests/domain.test.ts",
+    "test": "tsx --test src/detection.test.ts src/planning.test.ts tests/domain.test.ts tests/field.test.ts",
     "test:all": "npm run check && npm test && npm run test:integration && npm run test:module && npm run test:live",
     "test:integration": "tsx --test src/dataset.integration.test.ts src/planning.integration.test.ts",
     "build:module": "tsx scripts/cli.ts build",
@@ -28,6 +28,8 @@
     "ports": "tsx bridge/main.ts --list",
     "watch": "tsx scripts/watch.ts",
     "compressor": "tsx scripts/compressor.ts",
+    "field:demo": "tsx scripts/field_demo.ts",
+    "field:policy": "tsx scripts/field_policy.ts",
     "train": "tsx src/train_model.ts",
     "test:module": "vitest run --config spacetimedb/vitest.config.ts",
     "test:live": "tsx tests/live.ts"

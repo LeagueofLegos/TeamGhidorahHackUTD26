@@ -70,10 +70,10 @@ test("ML artifact enforces chronological availability, finite scores, and correc
   const m = JSON.parse(readFileSync("models/anomaly.json", "utf8")) as Model;
   validateModel(m);
   assert.equal(
-    infer(m, [1, 0, 1, 1], m.trainedThroughTs).state,
+    infer(m, [1, 0, 1, 1,1,0,1,1].slice(0,m.features.length), m.trainedThroughTs).state,
     "before_training_cutoff",
   );
-  const result = infer(m, [1, 0, 1, 1], m.trainedThroughTs + 300);
+  const result = infer(m, [1, 0, 1, 1,1,0,1,1].slice(0,m.features.length), m.trainedThroughTs + 300);
   assert.equal(result.label, "normal");
   assert.ok(Math.abs(result.scores!.reduce((a, b) => a + b, 0) - 1) < 1e-10);
   assert.throws(() => infer(m, [NaN, 0, 0, 0], m.trainedThroughTs + 1));

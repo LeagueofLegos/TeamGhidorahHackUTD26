@@ -33,6 +33,13 @@ export const AppState = __t.object("AppState", {
 });
 export type AppState = __Infer<typeof AppState>;
 
+export const AssetOperation = __t.object("AssetOperation", {
+  id: __t.string(),
+  state: __t.string(),
+  json: __t.string(),
+});
+export type AssetOperation = __Infer<typeof AssetOperation>;
+
 export const Audit = __t.object("Audit", {
   id: __t.u64(),
   atMs: __t.f64(),
@@ -89,6 +96,16 @@ export const Event = __t.object("Event", {
   json: __t.string(),
 });
 export type Event = __Infer<typeof Event>;
+
+export const FieldControl = __t.object("FieldControl", {
+  id: __t.string(),
+  state: __t.string(),
+  tripped: __t.bool(),
+  reason: __t.string(),
+  revision: __t.u32(),
+  json: __t.string(),
+});
+export type FieldControl = __Infer<typeof FieldControl>;
 
 export const HardwarePrediction = __t.object("HardwarePrediction", {
   id: __t.string(),
@@ -182,6 +199,27 @@ export const Tick = __t.object("Tick", {
   scheduledAt: __t.scheduleAt(),
 });
 export type Tick = __Infer<typeof Tick>;
+
+export const WarningForecast = __t.object("WarningForecast", {
+  id: __t.string(),
+  facilityId: __t.string(),
+  state: __t.string(),
+  hoursToShutdown: __t.option(__t.f64()),
+  json: __t.string(),
+});
+export type WarningForecast = __Infer<typeof WarningForecast>;
+
+export const WellProduction = __t.object("WellProduction", {
+  id: __t.string(),
+  systemId: __t.string(),
+  facilityId: __t.string(),
+  state: __t.string(),
+  deliveredOilBpd: __t.option(__t.f64()),
+  deliveredGasMcfd: __t.option(__t.f64()),
+  deliveredWaterBpd: __t.option(__t.f64()),
+  json: __t.string(),
+});
+export type WellProduction = __Infer<typeof WellProduction>;
 
 export const Writer = __t.object("Writer", {
   identity: __t.identity(),

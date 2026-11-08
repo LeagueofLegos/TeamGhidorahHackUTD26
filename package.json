@@ -1,18 +1,20 @@
 {
-  "name":"team-ghidorah-hackutd26",
-  "version":"1.0.0",
-  "private":true,
-  "scripts":{
-    "setup":"npm --prefix backend ci",
-    "dev":"npm --prefix backend run dev --",
-    "watch":"npm --prefix backend run watch",
-    "mock":"npm --prefix backend run mock --",
-    "bridge":"npm --prefix backend run bridge --",
-    "ports":"npm --prefix backend run ports",
-    "plan":"npm --prefix backend run plan --",
-    "data:fetch":"npm --prefix backend run data:fetch --",
-    "check":"npm --prefix backend run check",
-    "test":"npm --prefix backend test",
-    "test:all":"npm --prefix backend run test:all"
+  "name": "team-ghidorah-hackutd26",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "setup": "npm --prefix backend ci && npm --prefix frontend ci",
+    "dev": "node scripts/dev.mjs",
+    "dev:backend": "npm --prefix backend run dev --",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "watch": "npm --prefix backend run watch",
+    "mock": "npm --prefix backend run mock --",
+    "bridge": "npm --prefix backend run bridge --",
+    "ports": "npm --prefix backend run ports",
+    "plan": "npm --prefix backend run plan --",
+    "data:fetch": "npm --prefix backend run data:fetch --",
+    "check": "npm --prefix backend run check && npm --prefix frontend run build",
+    "test": "npm --prefix backend test && npm --prefix frontend test",
+    "test:all": "npm --prefix backend run test:all && npm --prefix frontend test && npm --prefix frontend run build"
   }
 }

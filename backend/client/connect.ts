@@ -17,6 +17,10 @@ export const SUMMARY_TABLES = [
   "audit",
   "compressor_state",
   "compressor_action",
+  "field_control",
+  "well_production",
+  "asset_operation",
+  "warning_forecast",
 ] as const;
 export type ConnectOptions = {
   uri?: string;
@@ -98,8 +102,13 @@ export function snapshot(conn: DbConnection) {
     hardwarePredictions: [...conn.db.hardwarePrediction.iter()],
     ml: [...conn.db.mlInference.iter()],
     scenarios: [...conn.db.scenario.iter()],
+    audit: [...conn.db.audit.iter()],
     compressor: [...conn.db.compressorState.iter()],
     compressorActions: [...conn.db.compressorAction.iter()],
+    field: conn.db.fieldControl.id.find("FIELD"),
+    wellProduction: [...conn.db.wellProduction.iter()],
+    assetOperations: [...conn.db.assetOperation.iter()],
+    warningForecasts: [...conn.db.warningForecast.iter()],
   };
 }
 // React: call onSnapshot from a useEffect, and return its cleanup function.

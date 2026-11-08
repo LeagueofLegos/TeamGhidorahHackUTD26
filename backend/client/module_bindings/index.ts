@@ -42,6 +42,8 @@ import GrantWriterReducer from "./grant_writer_reducer.js";
 import IngestFramesReducer from "./ingest_frames_reducer.js";
 import IngestHardwareReducer from "./ingest_hardware_reducer.js";
 import RecordDecisionReducer from "./record_decision_reducer.js";
+import ResetFieldReducer from "./reset_field_reducer.js";
+import SetFieldPolicyReducer from "./set_field_policy_reducer.js";
 import SimulateCompressorReducer from "./simulate_compressor_reducer.js";
 
 // Import all procedure arg schemas
@@ -49,12 +51,14 @@ import SimulateCompressorReducer from "./simulate_compressor_reducer.js";
 // Import all table schema definitions
 import AlertRow from "./alert_table.js";
 import AppStateRow from "./app_state_table.js";
+import AssetOperationRow from "./asset_operation_table.js";
 import AuditRow from "./audit_table.js";
 import CompressorActionRow from "./compressor_action_table.js";
 import CompressorStateRow from "./compressor_state_table.js";
 import EdgeRow from "./edge_table.js";
 import EntityRow from "./entity_table.js";
 import EventRow from "./event_table.js";
+import FieldControlRow from "./field_control_table.js";
 import HardwarePredictionRow from "./hardware_prediction_table.js";
 import HardwareStatusRow from "./hardware_status_table.js";
 import MlInferenceRow from "./ml_inference_table.js";
@@ -64,6 +68,8 @@ import RecommendationRow from "./recommendation_table.js";
 import ScenarioRow from "./scenario_table.js";
 import SensorCurrentRow from "./sensor_current_table.js";
 import SensorReadingRow from "./sensor_reading_table.js";
+import WarningForecastRow from "./warning_forecast_table.js";
+import WellProductionRow from "./well_production_table.js";
 
 /** Type-only namespace exports for generated type groups. */
 
@@ -102,6 +108,27 @@ const tablesSchema = __schema({
       ],
     },
     AppStateRow,
+  ),
+  assetOperation: __table(
+    {
+      name: "asset_operation",
+      indexes: [
+        {
+          accessor: "id",
+          name: "asset_operation_id_idx_btree",
+          algorithm: "btree",
+          columns: ["id"],
+        },
+      ],
+      constraints: [
+        {
+          name: "asset_operation_id_key",
+          constraint: "unique",
+          columns: ["id"],
+        },
+      ],
+    },
+    AssetOperationRow,
   ),
   audit: __table(
     {
@@ -212,6 +239,23 @@ const tablesSchema = __schema({
       ],
     },
     EventRow,
+  ),
+  fieldControl: __table(
+    {
+      name: "field_control",
+      indexes: [
+        {
+          accessor: "id",
+          name: "field_control_id_idx_btree",
+          algorithm: "btree",
+          columns: ["id"],
+        },
+      ],
+      constraints: [
+        { name: "field_control_id_key", constraint: "unique", columns: ["id"] },
+      ],
+    },
+    FieldControlRow,
   ),
   hardwarePrediction: __table(
     {
@@ -386,6 +430,48 @@ const tablesSchema = __schema({
     },
     SensorReadingRow,
   ),
+  warningForecast: __table(
+    {
+      name: "warning_forecast",
+      indexes: [
+        {
+          accessor: "id",
+          name: "warning_forecast_id_idx_btree",
+          algorithm: "btree",
+          columns: ["id"],
+        },
+      ],
+      constraints: [
+        {
+          name: "warning_forecast_id_key",
+          constraint: "unique",
+          columns: ["id"],
+        },
+      ],
+    },
+    WarningForecastRow,
+  ),
+  wellProduction: __table(
+    {
+      name: "well_production",
+      indexes: [
+        {
+          accessor: "id",
+          name: "well_production_id_idx_btree",
+          algorithm: "btree",
+          columns: ["id"],
+        },
+      ],
+      constraints: [
+        {
+          name: "well_production_id_key",
+          constraint: "unique",
+          columns: ["id"],
+        },
+      ],
+    },
+    WellProductionRow,
+  ),
 });
 
 /** The schema information for all reducers in this module. This is defined the same way as the reducers would have been defined in the server, except the body of the reducer is omitted in code generation. */
@@ -398,6 +484,8 @@ const reducersSchema = __reducers(
   __reducerSchema("ingest_frames", IngestFramesReducer),
   __reducerSchema("ingest_hardware", IngestHardwareReducer),
   __reducerSchema("record_decision", RecordDecisionReducer),
+  __reducerSchema("reset_field", ResetFieldReducer),
+  __reducerSchema("set_field_policy", SetFieldPolicyReducer),
   __reducerSchema("simulate_compressor", SimulateCompressorReducer),
 );
 
