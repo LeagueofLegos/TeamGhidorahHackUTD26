@@ -112,6 +112,9 @@ button.flow-node:hover { filter: brightness(1.2); }
 .dashboard-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .source-panel { flex: 0 0 auto; padding: 12px; }
 .source-panel > p:nth-child(2) { margin: 5px 0; font-size: 13px; }
+.source-panel .sketch-name { margin: 8px 0; color: #c4cfcc; font-size: 11px; overflow-wrap: anywhere; }
+.tank-selector { display: flex; flex-direction: column; gap: 5px; margin: 10px 0; color: #d3dddd; font: 10px "IBM Plex Mono", monospace; }
+.tank-selector select { width: 100%; min-height: 40px; padding: 6px 8px; border: 1px solid #4b5c62; border-radius: 0; background: #10191e; color: var(--text); font: 11px "DM Sans", sans-serif; }
 .source-panel > small { display: block; color: var(--muted); font-size: 11px; line-height: 1.45; }
 .database-indicator { display: flex; align-items: center; gap: 7px; margin-top: 12px; color: #b9c3c4; font: 9px "IBM Plex Mono", monospace; }
 .database-indicator i { width: 7px; height: 7px; border-radius: 50%; background: var(--amber); }

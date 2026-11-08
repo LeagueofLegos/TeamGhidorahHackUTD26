@@ -15,7 +15,7 @@ Open the local URL printed by Vite. Run the monitor over HTTPS or `localhost` to
 
 ### Dataset files
 
-Choose `network.json`, `ops.json`, and `telemetry.csv` together with **Load data**. The CSV format is:
+Choose an Arduino `.ino` sketch by itself to load it as a firmware reference, or choose `network.json`, `ops.json`, and `telemetry.csv` together to load telemetry. You may include one `.ino` file in the same selection. The CSV format is:
 
 ```csv
 timestamp,ts_unix,asset_id,metric,value
@@ -24,9 +24,18 @@ timestamp,ts_unix,asset_id,metric,value
 
 The monitor validates asset IDs, metric types, timestamps, status values, and tank levels before processing. Files are limited to 100 MB each and 2,000,000 telemetry rows. The provided `network.json` and `ops.json` are used as the default asset map and operating context for a serial connection. The app does not load answer-key files.
 
-### Web Serial
+### Arduino sketch and Web Serial
 
-Select **Connect sensor** and grant access to the intended serial device. The device must send one newline-delimited JSON object per reading at 115200 baud:
+Loading an `.ino` file does not compile, execute, or upload it to the board. Connect the flashed Arduino with **Connect sensor** and grant access to its serial device. Choose the tank connected to the overflow sensor. The board should print one of these newline-delimited outputs at 115200 baud:
+
+```text
+OVERFLOW
+NORMAL
+```
+
+`OVERFLOW` or `OVERFLOW: 1` raises a red alert; `NORMAL`, `GREEN`, `CLEAR`, `NO OVERFLOW`, or `OVERFLOW: 0` returns the tank to normal. Percent-level output such as `Tank level: 42%` is also supported and uses the configured warning/shutdown limits. Distance-only output is not interpreted because the tank's sensor-to-overflow calibration is hardware-specific.
+
+JSON telemetry is also supported:
 
 ```json
 {"timestamp":"2026-10-05T00:00:00Z","ts_unix":1791158400,"asset_id":"S1_TANK_A","metric":"level_pct","value":84.5}

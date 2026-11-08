@@ -1,5 +1,6 @@
 const REQUIRED_FILES = ["network.json", "ops.json", "telemetry.csv"];
 const MAX_FILE_BYTES = 100 * 1024 * 1024;
+const MAX_SKETCH_BYTES = 1024 * 1024;
 const MAX_ROWS = 2_000_000;
 const METRICS_BY_ASSET = {
   facility: new Set(["inflow_bpd"]),
@@ -177,6 +178,20 @@ export async function readDatasetFiles(fileList) {
     readings,
     nowTs: readings[readings.length - 1].ts_unix,
   };
+}
+
+export async function readArduinoSketch(file) {
+  if (!file || !file.name.toLowerCase().endsWith(".ino")) {
+    throw new Error("Choose an Arduino sketch with the .ino extension.");
+  }
+  if (file.size > MAX_SKETCH_BYTES) {
+    throw new Error("Arduino sketch exceeds the 1 MB file-size limit.");
+  }
+  const source = await file.text();
+  if (!source.trim() || source.includes("\0")) {
+    throw new Error("Arduino sketch is empty or is not valid text.");
+  }
+  return { name: file.name, source };
 }
 
 function latestFor(readingsByAssetMetric, assetId, metric, ts) {
@@ -391,4 +406,45 @@ export function parseSerialMessage(line) {
     metric: payload.metric,
     value: payload.value,
   };
+}
+
+export function parseArduinoSerialOutput(line, { tankId, tsUnix = Math.floor(Date.now() / 1000) } = {}) {
+  if (typeof line !== "string" || line.length > 64 * 1024) {
+    throw new Error("Sensor output is empty or exceeds 64 KB.");
+  }
+  const output = line.trim();
+  if (!output) throw new Error("Sensor output is empty.");
+  if (output.startsWith("{")) return parseSerialMessage(output);
+
+  if (typeof tankId !== "string" || !tankId.trim()) {
+    throw new Error("Select the tank monitored by this Arduino sensor.");
+  }
+
+  const reading = (metric, value) => ({
+    asset_id: tankId,
+    metric,
+    value,
+    ts_unix: tsUnix,
+  });
+  const normalized = output.toLowerCase().replace(/[_-]+/g, " ");
+  const explicitlyClear = /\b(normal|safe|green|clear|dry)\b/.test(normalized)
+    || /\b(no|not|false)\s+(?:overflow|overfill|spill)\b/.test(normalized)
+    || /\b(?:overflow|overfill|spill)\b\s*[:=]\s*(?:0|false|no|normal|clear|green)\b/.test(normalized);
+  const overflowState = /\b(overflow|overfill|spill)\b/.test(normalized);
+  const explicitOverflowValue = normalized.match(/\b(?:overflow|overfill|spill)\b\s*[:=]\s*([01])\b/);
+
+  if (explicitOverflowValue) {
+    return reading("overflow", Number(explicitOverflowValue[1]));
+  }
+  if (explicitlyClear) {
+    return reading("overflow", 0);
+  }
+  if (overflowState) {
+    return reading("overflow", 1);
+  }
+
+  const level = normalized.match(/\b(?:tank\s+)?(?:level|fill|water)\s*(?:is|:|=)\s*(\d+(?:\.\d+)?)\s*(%|\bpercent\b)/);
+  if (level) return reading("level_pct", Number(level[1]));
+
+  throw new Error("Unrecognized Arduino output. Send OVERFLOW, NORMAL/GREEN, or JSON sensor readings.");
 }

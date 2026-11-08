@@ -6,7 +6,8 @@ import { connectSpacetime, persistFeedSnapshot } from "./spacetime";
 import {
   createDatasetContext,
   detectAlerts,
-  parseSerialMessage,
+  parseArduinoSerialOutput,
+  readArduinoSketch,
   readDatasetFiles,
   validateSerialReading,
 } from "./monitor";
@@ -14,6 +15,10 @@ import "./style.css";
 
 const REFRESH_INTERVAL_MS = 150;
 const MAX_SERIAL_HISTORY = 30_000;
+const TANK_OPTIONS = DEFAULT_NETWORK.systems.flatMap((system) => system.facilities.map((facility) => ({
+  id: facility.tank.id,
+  label: `${system.id} · ${facility.name || facility.id} · ${facility.tank.id}`,
+})));
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -151,7 +156,7 @@ function playSiren(contextRef) {
   oscillator.stop(start + 0.78);
 }
 
-async function openSerialReader(onReading, onError, onDisconnected) {
+async function openSerialReader(onReading, onError, onDisconnected, tankId) {
   if (!window.isSecureContext || !("serial" in navigator)) {
     throw new Error("Web Serial requires a supported browser and a secure HTTPS or localhost connection.");
   }
@@ -179,7 +184,7 @@ async function openSerialReader(onReading, onError, onDisconnected) {
           buffer = buffer.slice(newline + 1);
           if (line) {
             try {
-              onReading(parseSerialMessage(line));
+              onReading(parseArduinoSerialOutput(line, { tankId }));
             } catch (error) {
               report(error);
             }
@@ -341,6 +346,8 @@ function App() {
   const [source, setSource] = useState("Waiting for telemetry");
   const [sourceError, setSourceError] = useState("");
   const [serialConnected, setSerialConnected] = useState(false);
+  const [sketchName, setSketchName] = useState("");
+  const [serialTankId, setSerialTankId] = useState(TANK_OPTIONS[0]?.id || "");
   const [loading, setLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundError, setSoundError] = useState("");
@@ -406,7 +413,7 @@ function App() {
       if (old) {
         currentAlerts.delete(previousId);
         nextLog = nextLog.map((entry) => entry.eventId === old.eventId && entry.status === "active"
-          ? { ...entry, status: "cleared", endedAt: Date.now() }
+          ? { ...entry, status: "cleared", severity: "normal", endedAt: Date.now() }
           : entry);
       }
     }
@@ -455,7 +462,19 @@ function App() {
     setLoading(true);
     setSourceError("");
     try {
-      const loaded = await readDatasetFiles(fileList);
+      const selectedFiles = [...fileList];
+      const sketches = selectedFiles.filter((file) => file.name.toLowerCase().endsWith(".ino"));
+      if (sketches.length > 1) throw new Error("Load one Arduino sketch at a time.");
+      const sketch = sketches.length ? await readArduinoSketch(sketches[0]) : null;
+      const dataFiles = selectedFiles.filter((file) => !file.name.toLowerCase().endsWith(".ino"));
+      if (!dataFiles.length) {
+        if (!sketch) throw new Error("Choose an Arduino .ino sketch or the network.json, ops.json, and telemetry.csv files.");
+        setSketchName(sketch.name);
+        setSource(`Arduino sketch loaded · ${sketch.name}`);
+        return;
+      }
+      const loaded = await readDatasetFiles(dataFiles);
+      if (sketch) setSketchName(sketch.name);
       stateRef.current = {
         ...stateRef.current,
         activeAlerts: [],
@@ -473,7 +492,7 @@ function App() {
       setSiteLog([]);
       setDashboardIds([]);
       setPopupId(null);
-      setSource(`Dataset loaded · ${loaded.readings.length.toLocaleString()} readings`);
+      setSource(`Dataset loaded · ${loaded.readings.length.toLocaleString()} readings${sketch ? ` · ${sketch.name}` : ""}`);
       applyReadings(loaded);
     } catch (error) {
       setSourceError(error instanceof Error ? error.message : String(error));
@@ -522,7 +541,7 @@ function App() {
         serialStopRef.current = null;
         setSerialConnected(false);
         setSource("Serial connection ended");
-      });
+      }, serialTankId);
       serialStopRef.current = stop;
       readingHistoryRef.current = [];
       previousDetectedRef.current = new Set();
@@ -642,7 +661,7 @@ function App() {
           <input
             ref={inputRef}
             type="file"
-            accept=".json,.csv,application/json,text/csv"
+            accept=".ino,.json,.csv,text/x-arduino,application/json,text/csv"
             multiple
             disabled={loading}
             onChange={(event) => void loadFiles(event.target.files || [])}
@@ -661,7 +680,7 @@ function App() {
     <div className="source-bar">
       <span className={`source-light ${serialConnected ? "online" : ""}`} />
       <span>{source}</span>
-      {!serialConnected && <small>Load network.json, ops.json &amp; telemetry.csv, or connect a Web Serial sensor.</small>}
+      {!serialConnected && <small>Load an Arduino .ino sketch, the network/ops/telemetry files, or connect a Web Serial sensor.</small>}
     </div>
     {(sourceError || soundError) && <div className="error-banner" role="alert">{sourceError || soundError}</div>}
 
@@ -711,7 +730,13 @@ function App() {
         <section className="panel source-panel" aria-label="Sensor input details">
           <p className="eyebrow">INPUT STATUS</p>
           <p><b>{serialConnected ? "Sensor connected" : "Read-only monitoring"}</b></p>
-          <small>Serial messages: one JSON object per line with asset_id, metric, value, and ts_unix. Port: 115200 baud. This page does not send control commands.</small>
+          {sketchName && <p className="sketch-name">Loaded sketch: <b>{sketchName}</b></p>}
+          <label className="tank-selector">Arduino overflow sensor tank
+            <select value={serialTankId} onChange={(event) => setSerialTankId(event.target.value)} disabled={serialConnected}>
+              {TANK_OPTIONS.map((tank) => <option key={tank.id} value={tank.id}>{tank.label}</option>)}
+            </select>
+          </label>
+          <small>Connect the Arduino with Connect sensor. Serial output OVERFLOW triggers red; NORMAL/GREEN clears it. JSON readings are also supported. Port: 115200 baud. The sketch is not compiled or uploaded here.</small>
           <div className="database-indicator" title={databaseError || "SpacetimeDB connection status"}>
             <i className={databaseStatus} /> DATABASE {databaseStatus.toUpperCase()}
           </div>

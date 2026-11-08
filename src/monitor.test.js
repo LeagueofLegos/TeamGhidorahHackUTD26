@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   createDatasetContext,
   detectAlerts,
+  parseArduinoSerialOutput,
   parseSerialMessage,
+  readArduinoSketch,
   readDatasetFiles,
   validateSerialReading,
 } from "./monitor.js";
@@ -101,6 +103,32 @@ test("serial parser and asset validation reject malformed input", () => {
     value: 1,
     ts_unix: 1,
   }), /known asset_id/);
+});
+
+test("Arduino serial output maps overflow to red and normal states to clear", () => {
+  const options = { tankId: facility.tank.id, tsUnix: 1_800_000_000 };
+  const overflow = parseArduinoSerialOutput("Overflow detected", options);
+  const normal = parseArduinoSerialOutput("Status: GREEN", options);
+  const noOverflow = parseArduinoSerialOutput("No overflow", options);
+  const level = parseArduinoSerialOutput("Tank level: 42%", options);
+  assert.deepEqual([overflow.metric, overflow.value], ["overflow", 1]);
+  assert.deepEqual([normal.metric, normal.value], ["overflow", 0]);
+  assert.deepEqual([noOverflow.metric, noOverflow.value], ["overflow", 0]);
+  assert.deepEqual([level.metric, level.value], ["level_pct", 42]);
+  assert.equal(findAlert(frame(options.tsUnix, {
+    [facility.tank.id]: { overflow: overflow.value },
+  }), "tank_overflow")?.severity, "alarm");
+  assert.equal(findAlert(frame(options.tsUnix, {
+    [facility.tank.id]: { overflow: normal.value, level_pct: 35 },
+  }), "tank_overflow"), undefined);
+  assert.throws(() => parseArduinoSerialOutput("Distance: 24 cm", options), /Unrecognized Arduino output/);
+});
+
+test("Arduino sketch loader accepts .ino source without executing it", async () => {
+  const sketch = await readArduinoSketch(file("overflow_sensor.ino", "void setup() {}\nvoid loop() {}"));
+  assert.equal(sketch.name, "overflow_sensor.ino");
+  await assert.rejects(readArduinoSketch(file("sensor.txt", "void setup() {}")), /\.ino extension/);
+  await assert.rejects(readArduinoSketch(file("empty.ino", "")), /empty or is not valid text/);
 });
 
 test("the documented history files load and validate as runtime telemetry", async () => {
