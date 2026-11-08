@@ -1,0 +1,18 @@
+{
+  "name":"team-ghidorah-hackutd26",
+  "version":"1.0.0",
+  "private":true,
+  "scripts":{
+    "setup":"npm --prefix backend ci",
+    "dev":"npm --prefix backend run dev --",
+    "watch":"npm --prefix backend run watch",
+    "mock":"npm --prefix backend run mock --",
+    "bridge":"npm --prefix backend run bridge --",
+    "ports":"npm --prefix backend run ports",
+    "plan":"npm --prefix backend run plan --",
+    "data:fetch":"npm --prefix backend run data:fetch --",
+    "check":"npm --prefix backend run check",
+    "test":"npm --prefix backend test",
+    "test:all":"npm --prefix backend run test:all"
+  }
+}

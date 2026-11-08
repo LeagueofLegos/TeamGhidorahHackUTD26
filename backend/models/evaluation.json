@@ -1,0 +1,53 @@
+{
+  "method": "Temporal split: first 30% train, remaining 70% held out. Running pumps only. Same synthetic practice network; not an independent field validation.",
+  "trainedThrough": "2026-10-07T02:20:00.000Z",
+  "trainRows": 6102,
+  "testRows": 14043,
+  "classes": [
+    "normal",
+    "pipeline_leak",
+    "pump_degradation"
+  ],
+  "confusion": [
+    [
+      12510,
+      0,
+      66
+    ],
+    [
+      4,
+      623,
+      0
+    ],
+    [
+      36,
+      0,
+      804
+    ]
+  ],
+  "metrics": [
+    {
+      "label": "normal",
+      "support": 12576,
+      "precision": 0.9968127490039841,
+      "recall": 0.9947519083969466,
+      "f1": 0.995781262437316
+    },
+    {
+      "label": "pipeline_leak",
+      "support": 627,
+      "precision": 1,
+      "recall": 0.9936204146730463,
+      "f1": 0.9968
+    },
+    {
+      "label": "pump_degradation",
+      "support": 840,
+      "precision": 0.9241379310344827,
+      "recall": 0.9571428571428572,
+      "f1": 0.9403508771929825
+    }
+  ],
+  "macroF1": 0.9776440465434328,
+  "notice": "Uncalibrated model scores; rules remain authoritative for fault and threshold detection. No real equipment controls."
+}

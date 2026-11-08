@@ -4,6 +4,7 @@ data/
 dist/
 coverage/
 .tokens/
+.runtime*/
 .env
 .env.*
 !.env.example

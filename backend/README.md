@@ -1,6 +1,6 @@
 # Ghidorah backend
 
-TypeScript backend foundation for the HackUTD water-disposal challenge. Input data, tank limits, production, and prices come from the selected challenge folder. All results are simulated advisory output. There is no equipment-control interface.
+Working TypeScript/SpacetimeDB backend for the HackUTD water-disposal challenge. Start with [START_HERE.md](START_HERE.md) for the complete setup and demonstration, or [FRONTEND.md](FRONTEND.md) for React subscriptions. Input data, tank limits, production, and prices come from the selected challenge folder. All results are simulated advisory output. There is no equipment-control interface.
 
 ## Install and check
 
@@ -98,7 +98,11 @@ Data must be fresh and complete at the chosen recorded timestamp. A first fault 
 
 At the supplied October 8 12:00 snapshot, S2's plan uses one truck each at facilities A and B and a delayed shut-in of S2_WELL_C1. The model totals about $3,120.94, including $1,810 in trucking and $1,310.94 in lost revenue, compared with about $12,214.94 for accepting all three shutdowns. Runtime code does not load reference actions.
 
-SpacetimeDB publishing, frontend subscriptions, and the read-only Arduino bridge remain the next integration stage. The stack remains TypeScript/Node.js, SpacetimeDB, React, and Arduino over USB. Detection currently uses rules/statistics and cost planning uses mathematical search. No trained machine-learning model is claimed by this implementation.
+The prototype includes a SpacetimeDB module, generated TypeScript bindings, browser subscription helper, data import/replay, receive-only Arduino bridge, mock producer, a separate six-well compressor simulation, scenarios, and revision-checked operator audit records. Live database planning uses a 2,000-state/100,000-vertex budget; the CLI retains the larger defaults above. Search scope/truncation is included in every plan.
+
+An actual trained softmax classifier supplements running-pump inspection evidence; it does not replace explicit fault detection or tank thresholds. It uses flow/capacity ratio, received-flow shortfall, and normalized pump/pipeline pressure. Only the first 30% of practice time is used to fit normalization and model weights; remaining samples form the temporal holdout. Macro F1 is approximately 0.978 over 14,043 held-out running samples. [Evaluation details](models/evaluation.json) include the confusion matrix and per-class metrics. These are uncalibrated synthetic-data scores, not real failure probabilities or independent field validation. Historical inference is disabled at/before training cutoff. `train_model.ts` alone accepts explicitly supplied practice labels; normal runtime still reads only the three application input files.
+
+The linked graph, observation provenance, event timeline, what-if comparisons, explainable plans and operator decision log are the Gotham-inspired elements. There is no Palantir dependency. Public tables support readers; writes require an explicitly authorized identity. This is a localhost hackathon prototype, not a production access-control or equipment-protection system. Tokens/configuration stay in ignored runtime directories.
 
 ## Tests
 

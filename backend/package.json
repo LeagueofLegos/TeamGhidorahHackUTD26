@@ -7,19 +7,41 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "check": "tsc --project tsconfig.json",
+    "check": "tsc --project tsconfig.json && tsc --project spacetimedb/tsconfig.json",
     "inspect": "tsx src/inspect_telemetry.ts",
     "detect": "tsx src/detect_events.ts",
     "plan": "tsx src/plan_responses.ts",
-    "test": "tsx --test src/detection.test.ts src/planning.test.ts",
-    "test:integration": "tsx --test src/dataset.integration.test.ts src/planning.integration.test.ts"
+    "test": "tsx --test src/detection.test.ts src/planning.test.ts tests/domain.test.ts",
+    "test:all": "npm run check && npm test && npm run test:integration && npm run test:module && npm run test:live",
+    "test:integration": "tsx --test src/dataset.integration.test.ts src/planning.integration.test.ts",
+    "build:module": "tsx scripts/cli.ts build",
+    "generate": "tsx scripts/cli.ts generate",
+    "publish:local": "tsx scripts/cli.ts publish",
+    "server": "tsx scripts/cli.ts server",
+    "dev": "npm run check && tsx scripts/dev.ts",
+    "format": "prettier --write src bridge client scripts tests spacetimedb/src",
+    "data:fetch": "tsx scripts/fetch_data.ts",
+    "import": "tsx scripts/import.ts",
+    "replay": "tsx scripts/import.ts data/HackUTD-ZeroDay/history/full_week --replay",
+    "mock": "tsx bridge/main.ts --mock",
+    "bridge": "tsx bridge/main.ts",
+    "ports": "tsx bridge/main.ts --list",
+    "watch": "tsx scripts/watch.ts",
+    "compressor": "tsx scripts/compressor.ts",
+    "train": "tsx src/train_model.ts",
+    "test:module": "vitest run --config spacetimedb/vitest.config.ts",
+    "test:live": "tsx tests/live.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "prettier": "3.6.2",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "3.2.7"
   },
   "dependencies": {
-    "csv-parse": "^7.0.3"
+    "csv-parse": "^7.0.3",
+    "serialport": "13.0.0",
+    "spacetimedb": "2.14.1"
   }
 }
