@@ -1,0 +1,10 @@
+node_modules/
+.idea/
+data/
+dist/
+coverage/
+.tokens/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
