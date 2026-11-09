@@ -57,9 +57,9 @@ This application is a read-only monitor. It does not issue shutdown, pump, or ot
 
 ## Public resume demo
 
-The Netlify build configured in the repository-root `netlify.toml` publishes a static demo build. Connect this repository to a Netlify site and deploy; the file explicitly sets the base directory to the repository root (`.`), runs the root Vite `npm run build`, publishes root `dist`, and enables demo-only mode for hosted builds. It does not need to install or invoke the SpacetimeDB CLI. No public database, account credential, or local `.env.local` setting is required.
+The Netlify build configured in the repository-root `netlify.toml` publishes a static demo build. Connect this repository to a Netlify site and deploy; the file explicitly sets the base directory to the repository root (`.`), invokes the root Vite JavaScript CLI directly with Node (avoiding executable-permission issues with `node_modules/.bin/vite`), publishes root `dist`, and enables demo-only mode for hosted builds. It does not need to install or invoke the SpacetimeDB CLI. No public database, account credential, or local `.env.local` setting is required.
 
-In the Netlify deploy log, confirm the resolved base is the repository root, the command is `npm run build`, and the publish directory is `dist`. If the log still reports `spacetimedb` as the base or runs the module's `spacetime build`, make sure the latest commit containing the root `netlify.toml` is deployed and that Netlify is using this repository's root configuration.
+In the Netlify deploy log, confirm the resolved base is the repository root, the command is `node node_modules/vite/bin/vite.js build`, and the publish directory is `dist`. If the log still reports `spacetimedb` as the base or runs the module's `spacetime build`, make sure the latest commit containing the root `netlify.toml` is deployed and that Netlify is using this repository's root configuration.
 
 Visitors see a **PUBLIC DEMO** notice and can click **Load demo** to inspect a small sample scenario with a warning and an overflow alert. The page starts empty. Demo alert actions and any files a visitor chooses to load stay in that visitor's browser. The hosted demo does not connect to SpacetimeDB or physical sensors. Local development keeps the normal database and sensor behavior.
 
