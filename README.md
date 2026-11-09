@@ -55,6 +55,14 @@ A tank overflow contact can report `{"asset_id":"S1_TANK_A","metric":"overflow",
 
 This application is a read-only monitor. It does not issue shutdown, pump, or other equipment-control commands. Follow site procedures and approved control and safety systems for real operations.
 
+## Public resume demo
+
+The Netlify build configured in `netlify.toml` publishes a static demo build. Connect this repository to a Netlify site and deploy; the file sets `npm run build`, publishes `dist`, and enables the demo-only mode for hosted builds. No public database, account credential, or local `.env.local` setting is required.
+
+Visitors see a **PUBLIC DEMO** notice and can click **Load demo** to inspect a small sample scenario with a warning and an overflow alert. The page starts empty. Demo alert actions and any files a visitor chooses to load stay in that visitor's browser. The hosted demo does not connect to SpacetimeDB or physical sensors. Local development keeps the normal database and sensor behavior.
+
+Netlify's generated site URL can be shared from a resume. Check Netlify's current plan, usage limits, and any domain registrar charges before publishing; free-tier availability and limits can change.
+
 ## SpacetimeDB state sync
 
 The TypeScript module in `spacetimedb/` stores each user's live alert state and recent activity. Its caller-filtered views and `sync_feed` reducer provide the browser persistence and synchronization path. The module must be published before the frontend can sync; build and binding generation do not publish it.

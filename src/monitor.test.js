@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   createDatasetContext,
+  createDemoDataset,
   detectAlerts,
   parseArduinoSerialOutput,
   parseSerialMessage,
@@ -50,6 +51,23 @@ function file(name, contents) {
 
 test("healthy operating readings produce no alerts", () => {
   assert.deepEqual(detectAlerts(dataset(frame(1_800_000_000))), []);
+});
+
+test("demo scenario is small and raises warning and overflow alerts", () => {
+  const demo = createDemoDataset(network, ops, 1_800_000_000);
+  const alerts = detectAlerts(demo);
+  assert.equal(demo.readings.length, 2);
+  assert.deepEqual(new Set(alerts.map((alert) => alert.category)), new Set(["tank_warning", "tank_overflow"]));
+  assert.ok(demo.readings.every((reading) => reading.ts_unix === demo.nowTs));
+});
+
+test("demo scenario rejects invalid timestamps or undersized networks", () => {
+  assert.throws(() => createDemoDataset(network, ops, -1), /non-negative integer/);
+  const oneFacilityNetwork = {
+    ...network,
+    systems: [{ ...network.systems[0], facilities: [facility] }],
+  };
+  assert.throws(() => createDemoDataset(oneFacilityNetwork, ops), /at least two facilities/);
 });
 
 test("tank warning and shutdown limits are inclusive", () => {

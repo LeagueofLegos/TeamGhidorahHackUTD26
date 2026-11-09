@@ -112,6 +112,33 @@ export function createDatasetContext(network, ops) {
   return { network, ops, assets };
 }
 
+export function createDemoDataset(network, ops, nowTs = Math.floor(Date.now() / 1000)) {
+  const context = createDatasetContext(network, ops);
+  const facilities = network.systems.flatMap((system) => system.facilities);
+  if (facilities.length < 2) {
+    throw new Error("The demo scenario requires at least two facilities.");
+  }
+  if (!Number.isSafeInteger(nowTs) || nowTs < 0) {
+    throw new Error("Demo timestamp must be a non-negative integer.");
+  }
+  const warningFacility = facilities[0];
+  const overflowFacility = facilities[1];
+  const level = Math.round(
+    (network.defaults.tank_limits_pct.warning + network.defaults.tank_limits_pct.shutdown) / 2 * 10
+  ) / 10;
+  const readings = [
+    { asset_id: warningFacility.tank.id, metric: "level_pct", value: level },
+    { asset_id: overflowFacility.tank.id, metric: "overflow", value: 1 },
+  ].map(({ asset_id, metric, value }) => ({
+    timestamp: new Date(nowTs * 1000).toISOString(),
+    ts_unix: nowTs,
+    asset_id,
+    metric,
+    value,
+  }));
+  return { ...context, readings, nowTs };
+}
+
 export async function readDatasetFiles(fileList) {
   const files = [...fileList];
   const byName = new Map(files.map((file) => [file.name.toLowerCase(), file]));

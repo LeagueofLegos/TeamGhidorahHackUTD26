@@ -4,6 +4,7 @@ import DEFAULT_NETWORK from "../HackUTD-ZeroDay-main/history/full_week/network.j
 import DEFAULT_OPS from "../HackUTD-ZeroDay-main/history/full_week/ops.json";
 import { connectSpacetime, persistFeedSnapshot } from "./spacetime";
 import {
+  createDemoDataset,
   createDatasetContext,
   detectAlerts,
   parseArduinoSerialOutput,
@@ -15,6 +16,7 @@ import "./style.css";
 
 const REFRESH_INTERVAL_MS = 150;
 const MAX_SERIAL_HISTORY = 30_000;
+const DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true";
 const TANK_OPTIONS = DEFAULT_NETWORK.systems.flatMap((system) => system.facilities.map((facility) => ({
   id: facility.tank.id,
   label: `${system.id} · ${facility.name || facility.id} · ${facility.tank.id}`,
@@ -343,7 +345,9 @@ function App() {
   const [siteLog, setSiteLog] = useState([]);
   const [dashboardIds, setDashboardIds] = useState([]);
   const [popupId, setPopupId] = useState(null);
-  const [source, setSource] = useState("Waiting for telemetry");
+  const [source, setSource] = useState(DEMO_MODE
+    ? "Demo ready · load the sample scenario to explore"
+    : "Waiting for telemetry");
   const [sourceError, setSourceError] = useState("");
   const [serialConnected, setSerialConnected] = useState(false);
   const [sketchName, setSketchName] = useState("");
@@ -351,7 +355,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [soundError, setSoundError] = useState("");
-  const [databaseStatus, setDatabaseStatus] = useState("connecting");
+  const [databaseStatus, setDatabaseStatus] = useState(DEMO_MODE ? "demo" : "connecting");
   const [databaseError, setDatabaseError] = useState("");
   const [clock, setClock] = useState(Date.now());
   const inputRef = useRef(null);
@@ -371,7 +375,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const disconnect = connectSpacetime({
+    const disconnect = DEMO_MODE ? () => {} : connectSpacetime({
       onSnapshots: (snapshot) => {
         if (stateRef.current.dataset.readings.length || stateRef.current.activeAlerts.length) return;
         const restored = fromDatabaseSnapshot(snapshot);
@@ -392,7 +396,29 @@ function App() {
   }, []);
 
   function persist(active, log) {
-    persistFeedSnapshot("live", toDatabaseSnapshot(active, log));
+    if (!DEMO_MODE) persistFeedSnapshot("live", toDatabaseSnapshot(active, log));
+  }
+
+  function loadDemo() {
+    setSourceError("");
+    const loaded = createDemoDataset(DEFAULT_NETWORK, DEFAULT_OPS);
+    stateRef.current = {
+      ...stateRef.current,
+      activeAlerts: [],
+      siteLog: [],
+      dashboardIds: [],
+      dataset: loaded,
+    };
+    setActiveAlerts([]);
+    setSiteLog([]);
+    setDashboardIds([]);
+    readingHistoryRef.current = loaded.readings;
+    previousDetectedRef.current = new Set();
+    suppressedRef.current = new Set();
+    acknowledgedRef.current = new Set();
+    setPopupId(null);
+    setSource(`Demo sample loaded · ${loaded.readings.length} readings`);
+    applyReadings(loaded);
   }
 
   function applyReadings(nextDataset) {
@@ -639,7 +665,7 @@ function App() {
       : "normal";
   const statusLabel = activeAlerts.length
     ? `${activeAlerts.length} ACTIVE ALERT${activeAlerts.length === 1 ? "" : "S"}`
-    : waitingForData ? "WAITING FOR DATA"
+    : waitingForData ? DEMO_MODE ? "DEMO READY" : "WAITING FOR DATA"
       : isDatasetReview ? "DATASET REVIEW"
         : telemetryStale ? "TELEMETRY STALE"
           : "ALL CLEAR";
@@ -653,7 +679,8 @@ function App() {
       <div className={`site-status ${statusSeverity}`}>
         <SeverityIcon severity={statusSeverity} />
         <span><b>{statusLabel}</b>
-          <small>{hasTelemetry ? `${activeAlarmCount} red · ${activeWarningCount} yellow` : "No sensor reading received"}</small></span>
+          <small>{hasTelemetry ? `${activeAlarmCount} red · ${activeWarningCount} yellow`
+            : DEMO_MODE ? "Load sample telemetry to explore" : "No sensor reading received"}</small></span>
       </div>
       <div className="header-controls">
         <label className={`button file-button ${loading ? "disabled" : ""}`}>
@@ -668,19 +695,27 @@ function App() {
             aria-label="Load network.json, ops.json, and telemetry.csv"
           />
         </label>
-        <button className={`button ${serialConnected ? "connected" : "secondary"}`} onClick={() => void toggleSerial()}>
+        {DEMO_MODE && <button className="button" onClick={loadDemo}>LOAD DEMO</button>}
+        {!DEMO_MODE && <button className={`button ${serialConnected ? "connected" : "secondary"}`} onClick={() => void toggleSerial()}>
           {serialConnected ? "DISCONNECT SENSOR" : "CONNECT SENSOR"}
-        </button>
+        </button>}
         <button className={`button ${soundEnabled ? "connected" : "secondary"}`} onClick={soundEnabled ? undefined : enableSound}>
           {soundEnabled ? "SOUND ON" : "ENABLE SOUND"}
         </button>
       </div>
     </header>
 
+    {DEMO_MODE && <div className="demo-banner" role="note">
+      <b>PUBLIC DEMO</b>
+      <span>Sample telemetry only. No live sensors or database; changes stay in this browser.</span>
+    </div>}
+
     <div className="source-bar">
       <span className={`source-light ${serialConnected ? "online" : ""}`} />
       <span>{source}</span>
-      {!serialConnected && <small>Load an Arduino .ino sketch, the network/ops/telemetry files, or connect a Web Serial sensor.</small>}
+      {!serialConnected && <small>{DEMO_MODE
+        ? "Load the sample scenario above or choose local telemetry files."
+        : "Load an Arduino .ino sketch, the network/ops/telemetry files, or connect a Web Serial sensor."}</small>}
     </div>
     {(sourceError || soundError) && <div className="error-banner" role="alert">{sourceError || soundError}</div>}
 
@@ -729,17 +764,20 @@ function App() {
         </section>
         <section className="panel source-panel" aria-label="Sensor input details">
           <p className="eyebrow">INPUT STATUS</p>
-          <p><b>{serialConnected ? "Sensor connected" : "Read-only monitoring"}</b></p>
-          {sketchName && <p className="sketch-name">Loaded sketch: <b>{sketchName}</b></p>}
-          <label className="tank-selector">Arduino overflow sensor tank
-            <select value={serialTankId} onChange={(event) => setSerialTankId(event.target.value)} disabled={serialConnected}>
-              {TANK_OPTIONS.map((tank) => <option key={tank.id} value={tank.id}>{tank.label}</option>)}
-            </select>
-          </label>
-          <small>Connect the Arduino with Connect sensor. Serial output OVERFLOW triggers red; NORMAL/GREEN clears it. JSON readings are also supported. Port: 115200 baud. The sketch is not compiled or uploaded here.</small>
-          <div className="database-indicator" title={databaseError || "SpacetimeDB connection status"}>
-            <i className={databaseStatus} /> DATABASE {databaseStatus.toUpperCase()}
-          </div>
+          <p><b>{DEMO_MODE ? "Sample data only" : serialConnected ? "Sensor connected" : "Read-only monitoring"}</b></p>
+          {DEMO_MODE ? <small>This public build does not connect to a database or physical sensor. Loaded files and alert actions remain in this browser.</small>
+            : <>
+              {sketchName && <p className="sketch-name">Loaded sketch: <b>{sketchName}</b></p>}
+              <label className="tank-selector">Arduino overflow sensor tank
+                <select value={serialTankId} onChange={(event) => setSerialTankId(event.target.value)} disabled={serialConnected}>
+                  {TANK_OPTIONS.map((tank) => <option key={tank.id} value={tank.id}>{tank.label}</option>)}
+                </select>
+              </label>
+              <small>Connect the Arduino with Connect sensor. Serial output OVERFLOW triggers red; NORMAL/GREEN clears it. JSON readings are also supported. Port: 115200 baud. The sketch is not compiled or uploaded here.</small>
+              <div className="database-indicator" title={databaseError || "SpacetimeDB connection status"}>
+                <i className={databaseStatus} /> DATABASE {databaseStatus.toUpperCase()}
+              </div>
+            </>}
         </section>
       </aside>
     </main>

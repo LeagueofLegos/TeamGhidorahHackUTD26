@@ -51,6 +51,9 @@ button { touch-action: manipulation; }
 .file-button.disabled { opacity: .6; pointer-events: none; }
 .source-bar { display: flex; flex: 0 0 auto; align-items: center; gap: 9px; min-height: 36px; padding: 5px 22px; border-bottom: 1px solid #2d3b41; background: #141e23; color: #d6dfdd; font-size: 12px; }
 .source-bar small { margin-left: auto; color: var(--muted); font: 10px "IBM Plex Mono", monospace; }
+.demo-banner { display: flex; flex: 0 0 auto; align-items: center; gap: 10px; min-height: 38px; padding: 6px 22px; border-bottom: 1px solid #8a754a; background: #302a21; color: #f0dfb8; font-size: 12px; }
+.demo-banner b { color: var(--amber); font: 600 10px "IBM Plex Mono", monospace; letter-spacing: .5px; white-space: nowrap; }
+.demo-banner span { color: #d6c9aa; }
 .source-light { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px #f2bd5770; }
 .source-light.online { background: var(--green); box-shadow: 0 0 7px #83c99c70; }
 .error-banner { flex: 0 0 auto; padding: 9px 22px; border-bottom: 1px solid #815048; background: #382522; color: #ffc0b7; font-size: 13px; }
@@ -157,6 +160,7 @@ button.flow-node:hover { filter: brightness(1.2); }
   .header-controls .button { flex: 1; min-width: 0; min-height: 42px; padding: 0 6px; font-size: 8px; }
   .source-bar { align-items: flex-start; flex-wrap: wrap; padding: 8px 10px; }
   .source-bar small { flex: 1 1 calc(100% - 17px); min-width: 0; margin-left: 17px; }
+  .demo-banner { align-items: flex-start; flex-direction: column; gap: 3px; padding: 8px 10px; }
   .workspace { grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 10px; }
   .diagram-panel { min-height: 285px; padding: 11px; }
   .side-column { display: contents; }
